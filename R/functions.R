@@ -153,7 +153,6 @@ Best_nc <- function(icas_list,
                     Pval = numeric())
   for (n.comp in range.comp) {
     nc_str <- paste("nc", n.comp, sep ="")
-    cat(nc_str, "\n")
     for (cv in cont_vars){
       best_c <- sort(abs(correlations[[cv]]$Rs[[nc_str]]),decreasing = T)[1] %>% names()
       to_plot %>% add_row(nc = nc_str,
@@ -170,7 +169,7 @@ Best_nc <- function(icas_list,
     geom_bar(stat='identity', position=position_dodge()) +
     geom_text(aes(x = nc, y = 0.1, label = IC), angle = 90, position = position_dodge(width = 0.9)) +
     theme_minimal() +
-    ggtitle("Space mean correlation with continuous variables")
+    ggtitle("ICA Space correlation with continuous variables")
 }
 
 
@@ -179,6 +178,45 @@ Best_nc <- function(icas_list,
 ##############################################################################
 #block of functions to analyze ICA analysis!
 ################################################################################
+
+plot_sample_weights <- function(A_mat, annotations, analysis_name){
+  stopifnot(rownames(A_mat) == rownames(annotations))
+  pdf(file=paste("02_Output/", analysis_name, ".pdf", sep=""))
+  # Sample weights
+  for (ann in colnames(annotations)){
+    
+    rug_aes <- annotations[[ann]]
+    rug_name <- ann
+    comps_plots <- lapply(colnames(A_mat), function(ic){
+      p <- 
+        ggplot(data.frame(A_mat)) +
+        aes_string(ic) +
+        geom_density() + 
+        geom_rug(aes(color = rug_aes), length = unit(0.1, "npc")) +
+        labs(color = ann) +
+        theme_classic() +
+        theme(axis.text.y = element_blank(),
+              axis.ticks.y = element_blank(),
+              axis.title.y = element_blank())
+      
+      if(is.integer(rug_aes)) {
+        p <- p  +
+          scale_color_discrete()
+        
+      } else if(is.double(rug_aes)){
+        p <- p  +
+          scico::scale_color_scico(palette = "berlin")
+      } 
+      
+      p
+      
+    })
+    ggarrange(plotlist = comps_plots, common.legend = T,  legend = "bottom") %>% annotate_figure(
+      top = text_grob(ann, color = "black", face = "bold", size = 14), ) %>% print()
+  }
+  dev.off()
+}
+
 
 flattenCorrMatrix <- function(cormat, pmat) { #V
   # ut <- upper.tri(cormat)
@@ -245,10 +283,8 @@ ICA_explorator <- function(ica,
            #main = title, mar=c(0,0,1,0))# http://stackoverflow.com/a/14754408/54964
   # dev.off()
   
-  ## Discrete (ADAPT)
+  ## Discrete
   corr_disc <- corr_values[,discrete_var]
-  #corr_disc <- na.exclude(corr_disc)
-  
   
   if (interest_IC == FALSE){
     corr_disc.m <- melt(corr_disc, measure.vars = paste("IC", 1:elected_ncomp, sep = "."))
@@ -301,7 +337,7 @@ ICA_explorator <- function(ica,
 
     
     (base_gg + geom_violin(aes(fill = get(i)), position=position_dodge(0.8), width=0.5) + 
-        geom_boxplot(aes(whtvr = get(i)), position=position_dodge(0.8), width=0.1) +
+        geom_boxplot(aes(color = get(i)), position=position_dodge(0.8), width=0.1) +
         labs(fill = "values") +
         theme_classic() + 
         #ggtitle(toupper(i)) +

@@ -1,0 +1,174 @@
+---
+title: "TCGA example"
+output: html_notebook
+---
+First steps are to load the dependencies and source the function files
+
+```{r}
+library(tidyverse)
+library(org.Hs.eg.db)
+library(AnnotationDbi)
+
+setwd("/home/jacobo/Documents/05_DeconvolutionReview/02_TCGA/")
+source(file = "/home/jacobo/Documents/05_DeconvolutionReview/R/functions.R" )
+```
+
+Then we load the data and metadata, with some filtering in the metadata too.
+
+```{r}
+tcga_raw <- read_tsv("01_Input/TCGA_TPM_PDAC.tsv") %>%
+  rename_all(~str_replace_all(.,"-", ".")) # JADE change this automatically after, so better start with them like this
+
+metadata <- read_tsv("01_Input/TCGA-CDR-SupplementalTableS1.tsv") %>%
+  dplyr::select(-...1) %>%
+  mutate(bcr_patient_barcode = str_replace_all(bcr_patient_barcode, "-", ".")) %>%
+  mutate(OS.time = as.double(OS.time),
+         PFI.time = as.double(PFI.time)) %>%
+  dplyr::filter(bcr_patient_barcode %in% colnames(tcga_raw)) %>% 
+  mutate_all( ~ replace(.,  . %in% c("#N/A","[Not Applicable]", "[Not Available]"), NA)) %>%
+  select_if(~sum(!is.na(.)) > 0)
+
+metadata_pdac_death <- metadata %>% dplyr::filter(DSS == 1)
+
+tcga <- tcga_raw %>% 
+    dplyr::select(c(gene, metadata_pdac_death$bcr_patient_barcode))
+```
+
+Next we need to prepare the TCGA data so we are able to run ICA in it. For that 
+
+#1 Filter the sexual chromosomes genes to avoid getting a sex component
+```{r}
+annot <- AnnotationDbi::select(org.Hs.eg.db, keys=tcga$gene, columns=c("ENSEMBL", "MAP"), keytype="SYMBOL")
+to_keep <- dplyr::filter(annot, !grepl('X|Y', MAP)) %>%
+  drop_na(MAP) %>%
+  dplyr::select("SYMBOL") %>%
+  distinct()
+
+tcga_ <- dplyr::filter(tcga, gene %in% to_keep$SYMBOL)
+
+```
+
+#2 Mean center genewise and selection of half most variable genes. Finally save an .RDS object as a checkpoint
+
+```{r}
+
+tcga__ <- tcga_ %>% pivot_longer(-gene, 'variable', 'value') %>%
+  pivot_wider(variable, gene) %>% 
+  mutate(across(where(is.numeric), ~ . - mean(.))) %>%
+  pivot_longer(-variable, 'gene', 'value') %>% 
+  pivot_wider(gene, variable)
+  #mutate(witc_across(where(is.numeric), ~ sum(abs(. - mean(.))) / length(.)))
+
+abdv <- apply(tcga__%>% dplyr::select(-gene), 1, function(x) {
+  sum(
+    abs(
+      x - mean(x)
+    )
+  ) / length(x)
+})
+
+median_abdv <- median(abdv)
+tcga_p <- tcga__[abdv > median_abdv, ]
+
+write_rds(tcga_p, file = "01_Input/tcga_icaready.RDS")
+```
+
+Now that the data is processed the next step is to iterate and run ICA over a range of components.
+This is done with the Range_ICA() function
+
+```{r}
+tcga_p <- read_rds("01_Input/tcga_icaready.RDS")
+icas_list <- column_to_rownames(tcga_p, "gene") %>% Range_ICA(2:20)
+```
+
+Once we have the list of components we can start the component analysis. This time want to see the best component representing "OS.time" and "PFI.time" of just the patients with a confirmed PDAC caused dead.
+This is done with the Best_nc() function
+
+```{r}
+Best_nc(icas_list,
+        range.comp = 2:20,
+        metadata = metadata_pdac_death,
+        metadata_id = "bcr_patient_barcode",
+        cont_vars = c("OS.time", "PFI.time"))
+```
+Then we can check the graph and choose the best ICA space based in the number of components. In our case we are interested in a space where a single component represent the best these two variables. For that reason we chose the ICA space for nc = 18 components, where we are particularly interested in the IC. 17.
+
+So we extract this ICA from the iteration we did.
+
+Once we now this we can check the distribution of the rest of variables across this space
+
+```{r}
+elected_ncomp = 18
+elected_ncomp_str <- paste("nc", elected_ncomp, sep = "")
+
+best_ica <- list()
+best_ica["S"] <- icas_list[["S"]][elected_ncomp_str]
+best_ica["A"] <- icas_list[["A"]][elected_ncomp_str]
+best_ica[["samples"]] <- icas_list[["samples"]]
+```
+
+Now its time to analyze the ICA space we have chosen. For that bthe first step is to plot the components distribution to discriminate those components that could be caused by outliers. If annotations are provided as a dataset (with the same sample order) one plot will be generated per column contrastimg their distribution compared to the component space. Make sure that your continuous labels are doubles!
+
+```{r}
+#tbfixed
+# annotations <- metadata_pdac_death %>%
+#   dplyr::select("bcr_patient_barcode", "OS.time", "gender") %>%
+#   column_to_rownames("bcr_patient_barcode")
+# 
+# plot_sample_weights(A_mat = best_ica[["A"]],
+#                     annotations = annotations,
+#                     analysis_name = "Iterative_test")
+```
+Now its the time to check the component space . For that we implemented a default function named ICA_explorator() to generate correlation plots with the data of your choice. We recommend to do a first test with the technical information available, as ICA can easily pick this kind of variability into a component.
+
+In this case we dont have such information, so we directly check the rest of the clinical data
+
+```{r}
+## clinical data
+metadata_cont <- c("age_at_initial_pathologic_diagnosis",
+                   "initial_pathologic_dx_year",
+                   "new_tumor_event_dx_days_to", "OS.time", "PFI.time", "DFI.time")
+metadata_disc <- c("gender", "race", "histological_type", "ajcc_pathologic_tumor_stage",
+                   "histological_grade", "vital_status", "tumor_status",
+                   "new_tumor_event_type", "new_tumor_event_site",
+                   "treatment_outcome_first_course", "OS", "DSS", "DFI")
+
+metadata_disc <- c("histological_type")
+### find IC responsible
+ICA_explorator(
+  ica = best_ica,
+  df = metadata_pdac_death,
+  df_cont = metadata_cont,
+  df_disc = metadata_disc,
+  df_id = "bcr_patient_barcode",
+  plot_dir = "02_Output/ICA10_plots",
+  analysis_name = "clinical_data",
+  interest_IC = "IC.18"
+)
+
+
+```
+
+This function can take whatever kind of continuous/discrete data and compare it to your weights based in an id column. For instance you could use this to try to relate the space we have (and specially IC. 17) to the estimated activity of the 50% most variable TFs
+
+```{r}
+#tbd
+```
+
+As well, you could build special functions for analyzing other kind of data. For instance we implemented a special function to analyze the different deconvolution methods and signatures segregated by CT of the output of  the GemDeCan deconvolution package (https://github.com/VeraPancaldiLab/GEMDeCan/).
+
+
+```{r}
+tcga_decon <- read_rds("01_Input/TCGA_PAAD_curated_deconvolutions_m.RDS") %>%
+  as_tibble(rownames = "samples") %>% 
+  mutate(samples = str_replace_all(samples, "-", ".")) %>% 
+  column_to_rownames("samples")
+
+res <- Corr_by_ct(best_ica[["A"]], tcga_decon)
+```
+
+We also offer an additional function to quickly explore any individual correlation you would like more indepth, specially related to the particular component IC.17. This is IC_test(), and can take continuous or discrete variables.
+
+```{r}
+#tbd
+```
