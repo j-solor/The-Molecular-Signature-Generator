@@ -111,13 +111,12 @@ Now its time to analyze the ICA space we have chosen. For that bthe first step i
 
 ```{r}
 #tbfixed
-# annotations <- metadata_pdac_death %>%
-#   dplyr::select("bcr_patient_barcode", "OS.time", "gender") %>%
-#   column_to_rownames("bcr_patient_barcode")
-# 
-# plot_sample_weights(A_mat = best_ica[["A"]],
-#                     annotations = annotations,
-#                     analysis_name = "Iterative_test")
+annotations <- metadata_pdac_death %>%
+  dplyr::select("bcr_patient_barcode", "OS.time", "gender") %>%
+  column_to_rownames("bcr_patient_barcode")
+
+plot_sample_weights(A_mat = best_ica[["A"]],
+                    annotations = annotations)
 ```
 Now its the time to check the component space . For that we implemented a default function named ICA_explorator() to generate correlation plots with the data of your choice. We recommend to do a first test with the technical information available, as ICA can easily pick this kind of variability into a component.
 
