@@ -181,7 +181,8 @@ Best_nc <- function(icas_list,
 
 plot_sample_weights <- function(A_mat, annotations, path = NA){
   stopifnot(rownames(A_mat) == rownames(annotations))
-  if (is.na(path)){pdf(file=paste(path, ".pdf", sep=""))}
+  if (!is.na(path)){pdf(file=paste(path, ".pdf", sep=""))}
+  
   # Sample weights
   for (ann in colnames(annotations)){
     
@@ -214,7 +215,7 @@ plot_sample_weights <- function(A_mat, annotations, path = NA){
     ggarrange(plotlist = comps_plots, common.legend = T,  legend = "bottom") %>% annotate_figure(
       top = text_grob(ann, color = "black", face = "bold", size = 14), ) %>% print()
   }
-  if (is.na(path)) {dev.off()}
+  if (!is.na(path)) {dev.off()}
 }
 
 
