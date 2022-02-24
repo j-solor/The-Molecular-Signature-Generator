@@ -179,9 +179,9 @@ Best_nc <- function(icas_list,
 #block of functions to analyze ICA analysis!
 ################################################################################
 
-plot_sample_weights <- function(A_mat, annotations, analysis_name){
+plot_sample_weights <- function(A_mat, annotations, path = NA){
   stopifnot(rownames(A_mat) == rownames(annotations))
-  pdf(file=paste("02_Output/", analysis_name, ".pdf", sep=""))
+  if (is.na(path)){pdf(file=paste(path, ".pdf", sep=""))}
   # Sample weights
   for (ann in colnames(annotations)){
     
@@ -214,7 +214,7 @@ plot_sample_weights <- function(A_mat, annotations, analysis_name){
     ggarrange(plotlist = comps_plots, common.legend = T,  legend = "bottom") %>% annotate_figure(
       top = text_grob(ann, color = "black", face = "bold", size = 14), ) %>% print()
   }
-  dev.off()
+  if (is.na(path)) {dev.off()}
 }
 
 
