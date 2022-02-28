@@ -8,6 +8,25 @@ suppressPackageStartupMessages({
 })
 ################################################################################
 
+# Customizable corrplot (modified from https://www.khstats.com/blog/corr-plots/corr-plots/)
+cors <- function(df, cor.stat) {
+  M <- Hmisc::rcorr(as.matrix(df), type = cor.stat)
+  Mdf <- map(M, ~data.frame(.x))
+  return(Mdf)
+}
+
+formatted_cors <- function(df, cor.stat){
+  cors(df, cor.stat) %>%
+    map(~rownames_to_column(.x, var="measure1")) %>%
+    map(~pivot_longer(.x, -measure1, "measure2")) %>%
+    bind_rows(.id = "id") %>%
+    pivot_wider(names_from = id, values_from = value) %>%
+    dplyr::rename(p = P) %>%
+    mutate(sig_p = ifelse(p < .05, T, F),
+           p_if_sig = ifelse(sig_p, p, NA),
+           r_if_sig = ifelse(sig_p, r, NA)) 
+}
+
 
 # documentation to be done. Newer version in  CAFs Alexia analysis
 
@@ -179,9 +198,9 @@ Best_nc <- function(icas_list,
 #block of functions to analyze ICA analysis!
 ################################################################################
 
-plot_sample_weights <- function(A_mat, annotations, path = NA){
+plot_sample_weights <- function(A_mat, annotations, plotfile = NA){
   stopifnot(rownames(A_mat) == rownames(annotations))
-  if (!is.na(path)){pdf(file=paste(path, ".pdf", sep=""))}
+  if (!is.na(plotfile)){pdf(file=paste(plotfile, ".pdf", sep=""))}
   
   # Sample weights
   for (ann in colnames(annotations)){
@@ -215,7 +234,7 @@ plot_sample_weights <- function(A_mat, annotations, path = NA){
     ggarrange(plotlist = comps_plots, common.legend = T,  legend = "bottom") %>% annotate_figure(
       top = text_grob(ann, color = "black", face = "bold", size = 14), ) %>% print()
   }
-  if (!is.na(path)) {dev.off()}
+  if (!is.na(plotfile)) {dev.off()}
 }
 
 
@@ -233,56 +252,47 @@ flattenCorrMatrix <- function(cormat, pmat) { #V
 
 ICA_explorator <- function(ica,
                              df,
-                             df_cont,
-                             df_disc,
+                             df_cont = NA,
+                             df_disc = NA,
                              A_id = 0,
                              df_id = 0, # 0 for rownmaes, otherwise put the colname
-                             plot_dir, analysis_name, # if this is the case no subdir will be created
+                             plotfile = NA, # Define the path and prefix of the file to be created if wnated
                              df_cont_special = FALSE,
                              df_disc_special = FALSE,
                              interest_IC = FALSE) {
   
-  S <- as.data.frame(ica[["S"]])
-  A <- as.data.frame(ica[["A"]])
-  #dir.create(plot_dir)
-  # General correlation
-  corr_values <- merge(A, df, by.x=A_id, by.y=df_id)
-  row.names(corr_values) <- corr_values[,"Row.names"] #!
-  corr_values <- subset(corr_values, select = -c(Row.names))
-  continuous_var <- c(colnames(A), df_cont)
-  discrete_var <- c(colnames(A), df_disc)
+  #S <- as.data.frame(ica[["S"]], rownames = "genes")
+  A <- as_tibble(ica[["A"]], rownames = df_id)
   
-  ## Continuous
-  corr_cont <- corr_values[,continuous_var]
-  #corr_cont <- na.exclude(corr_cont) # no NAs allowed in rcorr
-  res2 <- rcorr(x=as.matrix(corr_cont), type = "spearman")
-
-  res2$r <- res2$r[colnames(A), df_cont]
-  res2$P <- res2$P[colnames(A), df_cont]
-  title <- "Spearman correlation p < 0.05"
+  corr_values <- A %>% inner_join(df)
   
-  # if( length(df_cont) > 30){
-  #   # melt and order by greatest absolute correlations
-  #   flat_res <- flattenCorrMatrix(res2$r, res2$P)
-  #   flat_res_o <- flat_res[order(abs(flat_res$cor), decreasing = TRUE),]
-  #   if (interest_IC != FALSE){
-  #     flat_res_o <- flat_res_o[flat_res_o$column %in% interest_IC,]
-  #   }
-  #   
-  #   # get and filter by greatest correlations
-  #   cell_type_order <- unique(flat_res_o$row)
-  #   
-  #   res2$r <- res2$r[cell_type_order[1:30],]
-  #   res2$P <- res2$P[cell_type_order[1:30],]
-  # }
+  # Continuous
+  if (!any(is.na(df_cont))){
+    
+  corr_cont <- corr_values %>% dplyr::select(names(A), all_of(df_cont))
   
-  # p_dir <- paste(plot_dir, analysis_name, sep = "/")
-  # dir.create(p_dir)
-
-  corrplot(res2$r, type = "full", order="original", method = "circle",
-           p.mat = res2$P, sig.level = 0.05, insig = "blank", is.corr = T)#,
-           #main = title, mar=c(0,0,1,0))# http://stackoverflow.com/a/14754408/54964
-  # dev.off()
+  coerrelogram <- corr_cont %>%
+    column_to_rownames(df_id) %>%
+    formatted_cors("spearman") %>% #! adjust for conditional scaling
+    filter(measure1 %in% names(df), measure2 %in% names(A)) %>% #not square corr
+    ggplot(aes(measure1, measure2, fill=r, label=round(r_if_sig,2))) +
+    geom_tile() +
+    labs(x = NULL, y = NULL, fill = "Spearman's\nCorrelation", title= "ICA Sample weights correlations", 
+         subtitle="Only significant correlation coefficients shown (95% I.C.)") +
+    scale_fill_gradient2(mid="#FBFEF9",low="#0C6291",high="#A63446", limits=c(-1,1)) +
+    geom_text() +
+    theme_classic() +
+    scale_x_discrete(expand=c(0,0)) +
+    scale_y_discrete(expand=c(0,0)) + 
+    ggpubr::rotate_x_text(angle = 90)
+  
+  if (!is.na(plotfile)){
+    ggsave(coerrelogram, paste0(plotfile, "cont.pdf"), dpi = "print", width = 210, height = 150, units = "mm", scale = 1.25) #! adjust scale and implement auto scale
+  } else {
+    print(coerrelogram)
+  }
+  }
+}
   
   ## Discrete
   corr_disc <- corr_values[,discrete_var] 

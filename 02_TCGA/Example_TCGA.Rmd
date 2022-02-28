@@ -45,7 +45,6 @@ to_keep <- dplyr::filter(annot, !grepl('X|Y', MAP)) %>%
   distinct()
 
 tcga_ <- dplyr::filter(tcga, gene %in% to_keep$SYMBOL)
-
 ```
 
 #2 Mean center genewise and selection of half most variable genes. Finally save an .RDS object as a checkpoint
@@ -53,13 +52,12 @@ tcga_ <- dplyr::filter(tcga, gene %in% to_keep$SYMBOL)
 ```{r}
 
 tcga__ <- tcga_ %>% pivot_longer(-gene, 'variable', 'value') %>%
-  pivot_wider(variable, gene) %>% 
+  pivot_wider(variable, gene) %>%
   mutate(across(where(is.numeric), ~ . - mean(.))) %>%
   pivot_longer(-variable, 'gene', 'value') %>% 
   pivot_wider(gene, variable)
-  #mutate(witc_across(where(is.numeric), ~ sum(abs(. - mean(.))) / length(.)))
 
-abdv <- apply(tcga__%>% dplyr::select(-gene), 1, function(x) {
+abdv <- apply(tcga__%>% dplyr::select(-gene), 1, function(x) { #! could be piped with  add_row(variable = "mean", !!! colMeans(.[-1])) when transposed
   sum(
     abs(
       x - mean(x)
@@ -141,8 +139,7 @@ ICA_explorator(
   df_cont = metadata_cont,
   df_disc = metadata_disc,
   df_id = "bcr_patient_barcode",
-  plot_dir = "02_Output/ICA10_plots",
-  analysis_name = "clinical_data"
+  plotfile = NA, 
 )
 
 
