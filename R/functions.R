@@ -247,7 +247,7 @@ ICA_explorator <- function(ica,
   #dir.create(plot_dir)
   # General correlation
   corr_values <- merge(A, df, by.x=A_id, by.y=df_id)
-  row.names(corr_values) <- corr_values[,"Row.names"]
+  row.names(corr_values) <- corr_values[,"Row.names"] #!
   corr_values <- subset(corr_values, select = -c(Row.names))
   continuous_var <- c(colnames(A), df_cont)
   discrete_var <- c(colnames(A), df_disc)
@@ -276,16 +276,23 @@ ICA_explorator <- function(ica,
   #   res2$P <- res2$P[cell_type_order[1:30],]
   # }
   
-  p_dir <- paste(plot_dir, analysis_name, sep = "/")
-  dir.create(p_dir)
-  # pdf(paste(c(p_dir, "corrplot.pdf"), collapse = "/")) # problem with sizes, for decon is super big
+  # p_dir <- paste(plot_dir, analysis_name, sep = "/")
+  # dir.create(p_dir)
+
   corrplot(res2$r, type = "full", order="original", method = "circle",
            p.mat = res2$P, sig.level = 0.05, insig = "blank", is.corr = T)#,
            #main = title, mar=c(0,0,1,0))# http://stackoverflow.com/a/14754408/54964
   # dev.off()
   
   ## Discrete
-  corr_disc <- corr_values[,discrete_var]
+  corr_disc <- corr_values[,discrete_var] 
+  
+  test <- corr_disc %>% as_tibble(rownames = "samples") %>%
+    pivot_longer(colnames(A), names_to = 'component', values_to = 'weight') %>%
+    pivot_longer(all_of(df_disc) ,'variable', 'value') 
+  
+  test %>% ggplot(aes(x = weight,y = value)) +
+    geom_boxplot() + facet_grid(variable ~ component)
   
   if (interest_IC == FALSE){
     corr_disc.m <- melt(corr_disc, measure.vars = paste("IC", 1:elected_ncomp, sep = "."))

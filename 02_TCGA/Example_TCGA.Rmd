@@ -118,11 +118,13 @@ annotations <- metadata_pdac_death %>%
 plot_sample_weights(A_mat = best_ica[["A"]],
                     annotations = annotations)
 ```
-Now its the time to check the component space . For that we implemented a default function named ICA_explorator() to generate correlation plots with the data of your choice. We recommend to do a first test with the technical information available, as ICA can easily pick this kind of variability into a component.
+Now its the time to check the whole component space. For that we implemented a default function named ICA_explorator() to generate correlation plots with the data of your choice. We recommend to do a first test with the technical information available, as ICA can easily pick this kind of variability into a component.
 
 In this case we dont have such information, so we directly check the rest of the clinical data
 
 ```{r}
+#! Fix conditional testing of vars with not enough datapoints
+#! Fix ploting size for ncomponents close to 20
 ## clinical data
 metadata_cont <- c("age_at_initial_pathologic_diagnosis",
                    "initial_pathologic_dx_year",
@@ -132,7 +134,6 @@ metadata_disc <- c("gender", "race", "histological_type", "ajcc_pathologic_tumor
                    "new_tumor_event_type", "new_tumor_event_site",
                    "treatment_outcome_first_course", "OS", "DSS", "DFI")
 
-metadata_disc <- c("histological_type")
 ### find IC responsible
 ICA_explorator(
   ica = best_ica,
@@ -141,8 +142,7 @@ ICA_explorator(
   df_disc = metadata_disc,
   df_id = "bcr_patient_barcode",
   plot_dir = "02_Output/ICA10_plots",
-  analysis_name = "clinical_data",
-  interest_IC = "IC.18"
+  analysis_name = "clinical_data"
 )
 
 
@@ -151,13 +151,14 @@ ICA_explorator(
 This function can take whatever kind of continuous/discrete data and compare it to your weights based in an id column. For instance you could use this to try to relate the space we have (and specially IC. 17) to the estimated activity of the 50% most variable TFs
 
 ```{r}
-#tbd
+# Generate TF act of TCGA and do comparsion
 ```
 
 As well, you could build special functions for analyzing other kind of data. For instance we implemented a special function to analyze the different deconvolution methods and signatures segregated by CT of the output of  the GemDeCan deconvolution package (https://github.com/VeraPancaldiLab/GEMDeCan/).
 
 
 ```{r}
+# need to fix!
 tcga_decon <- read_rds("01_Input/TCGA_PAAD_curated_deconvolutions_m.RDS") %>%
   as_tibble(rownames = "samples") %>% 
   mutate(samples = str_replace_all(samples, "-", ".")) %>% 
@@ -169,5 +170,11 @@ res <- Corr_by_ct(best_ica[["A"]], tcga_decon)
 We also offer an additional function to quickly explore any individual correlation you would like more indepth, specially related to the particular component IC.17. This is IC_test(), and can take continuous or discrete variables.
 
 ```{r}
-#tbd
+#! tbd
+```
+
+Its very important to check the gene weights of the component space, as it comes in thousands, not in hundreds like the samples. Directly testing these with ssGSEA, or just checking the 50 genes at each side of the tail can give a nice overview of what is behind of the component.
+
+```{r}
+#! import from bootstrap
 ```
