@@ -133,6 +133,12 @@ Best_nc <- function(icas_list,
                           cont_vars,
                           disc_vars = NULL) {
   # Continuous
+  to_plot <- tibble(nc = character(),
+                    var = character(),
+                    IC = character(),
+                    R = numeric(),
+                    Pval = numeric())
+  
   correlations <- list()
   for (cv in cont_vars){
     correlations[[cv]] <- list()
@@ -150,6 +156,7 @@ Best_nc <- function(icas_list,
     test_vars <- merge(ica.nc, metadata, by.x=0,by.y=metadata_id) %>% column_to_rownames("Row.names")
     continuous_var <- c(colnames(ica.nc), cont_vars)
     
+    # Correlate all ICs per component
     if (length(cont_vars) > 0){
       
       test_cont <- test_vars[,continuous_var]
@@ -165,24 +172,16 @@ Best_nc <- function(icas_list,
         correlations[[cv]]$Pvals[[nc_str]] <- res2$P[cv,]
       }
     }
-  }
-  ## Check the best
-  to_plot <- tibble(nc = character(),
-                    var = character(),
-                    IC = character(),
-                    R = numeric(),
-                    Pval = numeric())
-  for (n.comp in range.comp) {
-    nc_str <- paste("nc", n.comp, sep ="")
+    # Check the best IC and save it as a representative of the nc
     for (cv in cont_vars){
       best_c <- sort(abs(correlations[[cv]]$Rs[[nc_str]]),decreasing = T)[1] %>% names()
       to_plot %>% add_row(nc = nc_str,
-             var = cv,
-             IC = best_c,
-             R = abs(correlations[[cv]]$Rs[[nc_str]][[best_c]]),
-             Pval = correlations[[cv]]$Pvals[[nc_str]][[best_c]]) -> to_plot
+                          var = cv,
+                          IC = best_c,
+                          R = abs(correlations[[cv]]$Rs[[nc_str]][[best_c]]),
+                          Pval = correlations[[cv]]$Pvals[[nc_str]][[best_c]]) -> to_plot
     }
-  }
+    }
   
   to_plot %>% group_by(nc) %>% summarise(meanR = mean(R)) %>% arrange(desc(meanR)) %>% dplyr::select(nc) -> order_bars
   to_plot$nc %>% factor(order_bars$nc) -> to_plot$nc
