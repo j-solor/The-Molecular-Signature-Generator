@@ -132,7 +132,7 @@ Best_nc <- function(icas_list,
                           metadata_id = 0,
                           cont_vars,
                           disc_vars = NULL) {
-  
+  # Continuous
   correlations <- list()
   for (cv in cont_vars){
     correlations[[cv]] <- list()
@@ -157,8 +157,8 @@ Best_nc <- function(icas_list,
       test_cont <- drop_na(test_cont)
       res2 <- rcorr(x=as.matrix(test_cont), type = "spearman")
         
-      res2$r <- res2$r[cont_vars, colnames(ica.nc)]
-      res2$P <- res2$P[cont_vars, colnames(ica.nc)]
+      res2$r <- res2$r[cont_vars, colnames(ica.nc),drop=F]
+      res2$P <- res2$P[cont_vars, colnames(ica.nc),drop=F]
       
       for (cv in cont_vars) { 
         correlations[[cv]]$Rs[[nc_str]] <- res2$r[cv,]
@@ -303,7 +303,7 @@ ICA_explorator <- function(ica,
     for (var in df_disc){
       to_plot <- corr_disc %>%
         dplyr::select(names(A), all_of(var)) %>%
-        pivot_longer(names(A)[-1], names_to = 'component', values_to = 'weight') %>%
+        # pivot_longer(names(A)[-1], names_to = 'component', values_to = 'weight') %>%
         mutate_at(vars(component), ~(factor(., levels=names(A)[-1])))
       
       plot_list[[var]] <- to_plot %>% ggplot() + aes_string(color = var, x = var, y = "weight") +
