@@ -87,7 +87,7 @@ Best_nc(icas_list,
         range.comp = 2:20,
         metadata = metadata_pdac_death,
         metadata_id = "bcr_patient_barcode",
-        cont_vars = c("OS.time", "PFI.time"))
+        cont_vars = c("OS.time", "PFI.time")) #! fix for when only one parameter is provided
 ```
 Then we can check the graph and choose the best ICA space based in the number of components. In our case we are interested in a space where a single component represent the best these two variables. For that reason we chose the ICA space for nc = 18 components, where we are particularly interested in the IC. 17.
 
@@ -120,29 +120,39 @@ Now its the time to check the whole component space. For that we implemented a d
 
 In this case we dont have such information, so we directly check the rest of the clinical data
 
-```{r}
+```{r, results='hide'}
 #! Fix conditional testing of vars with not enough datapoints
 #! Fix ploting size for ncomponents close to 20
 ## clinical data
 metadata_cont <- c("age_at_initial_pathologic_diagnosis",
                    "initial_pathologic_dx_year",
                    "new_tumor_event_dx_days_to", "OS.time", "PFI.time", "DFI.time")
+# metadata_disc <- c("gender", "race", "histological_type", "ajcc_pathologic_tumor_stage",
+#                    "histological_grade", "vital_status", "tumor_status",
+#                    "new_tumor_event_type", "new_tumor_event_site",
+#                    "treatment_outcome_first_course", "OS", "DSS", "DFI")
+
 metadata_disc <- c("gender", "race", "histological_type", "ajcc_pathologic_tumor_stage",
-                   "histological_grade", "vital_status", "tumor_status",
-                   "new_tumor_event_type", "new_tumor_event_site",
-                   "treatment_outcome_first_course", "OS", "DSS", "DFI")
+                   "histological_grade")
 
 ### find IC responsible
-ICA_explorator(
+clinical_data_plots <- ICA_explorator(
   ica = best_ica,
   df = metadata_pdac_death,
   df_cont = metadata_cont,
   df_disc = metadata_disc,
   df_id = "bcr_patient_barcode",
   plotfile = NA, 
-)
+) #! remove warning NANs when plotting R in correlogram
+```
 
+This Function returns a list containing 2 ggplot objects you can manipulate to save as you desire
+```{r,  fig.width=5, fig.height=6}
+clinical_data_plots$cont  
+```
 
+```{r,  fig.width=10, fig.height=8}
+clinical_data_plots$disc
 ```
 
 This function can take whatever kind of continuous/discrete data and compare it to your weights based in an id column. For instance you could use this to try to relate the space we have (and specially IC. 17) to the estimated activity of the 50% most variable TFs

@@ -5,6 +5,8 @@ suppressPackageStartupMessages({
   library(corrplot)
   library(pheatmap)
   library(reshape2)
+  library(scales) #! create my own scales::rescale function?
+  library(patchwork)
 })
 ################################################################################
 
@@ -254,24 +256,19 @@ ICA_explorator <- function(ica,
                              df,
                              df_cont = NA,
                              df_disc = NA,
-                             A_id = 0,
                              df_id = 0, # 0 for rownmaes, otherwise put the colname
                              plotfile = NA, # Define the path and prefix of the file to be created if wnated
-                             df_cont_special = FALSE,
-                             df_disc_special = FALSE,
                              interest_IC = FALSE) {
   
-  #S <- as.data.frame(ica[["S"]], rownames = "genes")
   A <- as_tibble(ica[["A"]], rownames = df_id)
-  
   corr_values <- A %>% inner_join(df)
-  
+  returning_list <- list()
   # Continuous
   if (!any(is.na(df_cont))){
     
   corr_cont <- corr_values %>% dplyr::select(names(A), all_of(df_cont))
   
-  coerrelogram <- corr_cont %>%
+  returning_list[["cont"]] <- corr_cont %>%
     column_to_rownames(df_id) %>%
     formatted_cors("spearman") %>% #! adjust for conditional scaling
     filter(measure1 %in% names(df), measure2 %in% names(A)) %>% #not square corr
@@ -288,81 +285,109 @@ ICA_explorator <- function(ica,
   
   if (!is.na(plotfile)){
     ggsave(coerrelogram, paste0(plotfile, "cont.pdf"), dpi = "print", width = 210, height = 150, units = "mm", scale = 1.25) #! adjust scale and implement auto scale
-  } else {
-    print(coerrelogram)
+    } else {
+    #print(coerrelogram)
+    }
   }
+
+
+  # Categorical
+  if (!any(is.na(df_disc))){
+    
+    corr_disc <- corr_values %>%
+      dplyr::select(names(A), all_of(df_disc)) %>%
+      mutate_at(names(A)[-1], ~(rescale(., to = c(-1, 1)) %>% as.vector)) # standarization is needed for visualization
+    
+    plot_list <- list()
+    legend_list <- list()
+    for (var in df_disc){
+      to_plot <- corr_disc %>%
+        dplyr::select(names(A), all_of(var)) %>%
+        pivot_longer(names(A)[-1], names_to = 'component', values_to = 'weight') %>%
+        mutate_at(vars(component), ~(factor(., levels=names(A)[-1])))
+      
+      plot_list[[var]] <- to_plot %>% ggplot() + aes_string(color = var, x = var, y = "weight") +
+        geom_point() +
+        facet_grid(. ~ component)  +
+        labs(x = NULL, y = NULL, color = var) +
+        rremove("axis.text") + 
+        rremove("ticks")
+    }
+    returning_list[["disc"]] <- wrap_plots(plot_list, ncol = 1, guides = "collect")
   }
+  return(returning_list)
 }
+
   
-  ## Discrete
-  corr_disc <- corr_values[,discrete_var] 
-  
-  test <- corr_disc %>% as_tibble(rownames = "samples") %>%
-    pivot_longer(colnames(A), names_to = 'component', values_to = 'weight') %>%
-    pivot_longer(all_of(df_disc) ,'variable', 'value') 
-  
-  test %>% ggplot(aes(x = weight,y = value)) +
-    geom_boxplot() + facet_grid(variable ~ component)
-  
-  if (interest_IC == FALSE){
-    corr_disc.m <- melt(corr_disc, measure.vars = paste("IC", 1:elected_ncomp, sep = "."))
-  } else {
-    corr_disc.m <- melt(corr_disc, measure.vars = interest_IC)
-  }
-  ### boxplots (+ stat significance) # STATS ONLY WORK WHEN interest_IC == TRUE!!!!!!
-  base_gg <- ggplot(data = corr_disc.m, aes(x=variable, y=value))
-  
-  for (i in df_disc){
-    groups <- df[,i,drop = T] %>% unique()
-    n_groups <- groups %>% length()
-    
-    # assumptions for t-test/1ANOVA
-    ## normality
-    for (g in groups) {
-      n.pv = with(corr_disc.m, shapiro.test(value[get(i) == g]))$p.value
-      if (n.pv < 0.05){norm = FALSE; break} else {norm = TRUE}
-    }
-
-    ## equal variance (fligner test as its better with non normality)
-    v.pv = fligner.test(value ~ get(i), data = corr_disc.m)$p.value
-    if (v.pv < 0.05){eqvar = FALSE} else {eqvar = TRUE}
-
-    print(c(i,g,norm,eqvar))
-    # test choice
-    ## 2 groups
-    if (n_groups < 3){
-      if (all.equal(norm, eqvar, TRUE) == TRUE){
-        stats <- t.test(value ~ get(i), data = corr_disc.m, var.equal = TRUE)
-      } else if(eqvar == TRUE) {
-        stats <- wilcox.test(value ~ get(i), data = corr_disc.m)
-      } else {
-        stats <- kruskal.test(value ~ get(i), data = corr_disc.m) # no need for equal variance nor normality
-      }
-    }
-
-    ## 3 or more groups
-    else {
-      if (all.equal(norm, eqvar, TRUE) == TRUE){
-        stats <- aov(value ~ get(i), data = corr_disc.m)
-
-      } else if(norm == TRUE) {
-        stats <- oneway.test(value ~ get(i), data = corr_disc.m)
-
-      } else {
-        stats <- kruskal.test(value ~ get(i), data = corr_disc.m)
-      }
-    }
-
-    
-    (base_gg + geom_violin(aes(fill = get(i)), position=position_dodge(0.8), width=0.5) + 
-        geom_boxplot(aes(color = get(i)), position=position_dodge(0.8), width=0.1) +
-        labs(fill = "values") +
-        theme_classic() + 
-        #ggtitle(toupper(i)) +
-        ggtitle(toupper(i), subtitle = paste(stats$method,signif(stats$p.value, 2))) +
-        ylab("weight") +
-        xlab("component")) %>% print()
-  }
+  # ## Discrete
+  # corr_disc <- corr_values[,discrete_var] 
+  # 
+  # test <- corr_disc %>% as_tibble(rownames = "samples") %>%
+  #   pivot_longer(colnames(A), names_to = 'component', values_to = 'weight') %>%
+  #   pivot_longer(all_of(df_disc) ,'variable', 'value') 
+  # 
+  # test %>% ggplot(aes(x = weight,y = value)) +
+  #   geom_boxplot() + facet_grid(variable ~ component)
+  # 
+  # if (interest_IC == FALSE){
+  #   corr_disc.m <- melt(corr_disc, measure.vars = paste("IC", 1:elected_ncomp, sep = "."))
+  # } else {
+  #   corr_disc.m <- melt(corr_disc, measure.vars = interest_IC)
+  # }
+  # ### boxplots (+ stat significance) # STATS ONLY WORK WHEN interest_IC == TRUE!!!!!!
+  # base_gg <- ggplot(data = corr_disc.m, aes(x=variable, y=value))
+  # 
+  # for (i in df_disc){
+  #   groups <- df[,i,drop = T] %>% unique()
+  #   n_groups <- groups %>% length()
+  #   
+  #   # assumptions for t-test/1ANOVA
+  #   ## normality
+  #   for (g in groups) {
+  #     n.pv = with(corr_disc.m, shapiro.test(value[get(i) == g]))$p.value
+  #     if (n.pv < 0.05){norm = FALSE; break} else {norm = TRUE}
+  #   }
+  # 
+  #   ## equal variance (fligner test as its better with non normality)
+  #   v.pv = fligner.test(value ~ get(i), data = corr_disc.m)$p.value
+  #   if (v.pv < 0.05){eqvar = FALSE} else {eqvar = TRUE}
+  # 
+  #   print(c(i,g,norm,eqvar))
+  #   # test choice
+  #   ## 2 groups
+  #   if (n_groups < 3){
+  #     if (all.equal(norm, eqvar, TRUE) == TRUE){
+  #       stats <- t.test(value ~ get(i), data = corr_disc.m, var.equal = TRUE)
+  #     } else if(eqvar == TRUE) {
+  #       stats <- wilcox.test(value ~ get(i), data = corr_disc.m)
+  #     } else {
+  #       stats <- kruskal.test(value ~ get(i), data = corr_disc.m) # no need for equal variance nor normality
+  #     }
+  #   }
+  # 
+  #   ## 3 or more groups
+  #   else {
+  #     if (all.equal(norm, eqvar, TRUE) == TRUE){
+  #       stats <- aov(value ~ get(i), data = corr_disc.m)
+  # 
+  #     } else if(norm == TRUE) {
+  #       stats <- oneway.test(value ~ get(i), data = corr_disc.m)
+  # 
+  #     } else {
+  #       stats <- kruskal.test(value ~ get(i), data = corr_disc.m)
+  #     }
+  #   }
+  # 
+  #   
+  #   (base_gg + geom_violin(aes(fill = get(i)), position=position_dodge(0.8), width=0.5) + 
+  #       geom_boxplot(aes(color = get(i)), position=position_dodge(0.8), width=0.1) +
+  #       labs(fill = "values") +
+  #       theme_classic() + 
+  #       #ggtitle(toupper(i)) +
+  #       ggtitle(toupper(i), subtitle = paste(stats$method,signif(stats$p.value, 2))) +
+  #       ylab("weight") +
+  #       xlab("component")) %>% print()
+  # }
   
   
   # Detailed samplemaps
@@ -403,7 +428,7 @@ ICA_explorator <- function(ica,
   #     )
   #   })
   # }
-}
+  # }
 
 
 
