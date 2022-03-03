@@ -6,6 +6,7 @@ suppressPackageStartupMessages({
   library(pheatmap)
   library(reshape2)
   library(scales) #! create my own scales::rescale function?
+  library(ggpubr) 
   library(patchwork)
 })
 ################################################################################
@@ -130,9 +131,9 @@ Best_nc <- function(icas_list,
                           range.comp,
                           metadata,
                           metadata_id = 0,
-                          cont_vars,
-                          disc_vars = NULL) {
-  # Continuous
+                          vars,
+                          is.categorical = FALSE) {
+
   to_plot <- tibble(nc = character(),
                     var = character(),
                     IC = character(),
@@ -140,40 +141,53 @@ Best_nc <- function(icas_list,
                     Pval = numeric())
   
   correlations <- list()
-  for (cv in cont_vars){
+  for (cv in vars){
     correlations[[cv]] <- list()
-    correlations[[cv]][["Pvals"]] <- list()
+    correlations[[cv]][["Pvals"]] <- list() #! store only Rs?
     correlations[[cv]][["Rs"]] <- list()
-    
   }
 
   
   for (n.comp in range.comp) {
     nc_str <- paste("nc", n.comp, sep ="")
-    ica.nc <- icas_list$A[[nc_str]]
+    ica.nc <- icas_list$A[[nc_str]] %>% as_tibble(rownames = "samples")
+    test_vars <- dplyr::rename(metadata, samples = all_of(metadata_id)) %>% inner_join(ica.nc)
     
-    stopifnot(rownames(ica.nc) == icas_list$samples)
-    test_vars <- merge(ica.nc, metadata, by.x=0,by.y=metadata_id) %>% column_to_rownames("Row.names")
-    continuous_var <- c(colnames(ica.nc), cont_vars)
-    
-    # Correlate all ICs per component
-    if (length(cont_vars) > 0){
+    if (is.categorical == FALSE){
+      continuous_var <- c(names(ica.nc), vars)
+      test_cont <- dplyr::select(test_vars, all_of(continuous_var)) %>%
+        drop_na() %>%
+        column_to_rownames("samples")
       
-      test_cont <- test_vars[,continuous_var]
-        
-      test_cont <- drop_na(test_cont)
       res2 <- rcorr(x=as.matrix(test_cont), type = "spearman")
         
-      res2$r <- res2$r[cont_vars, colnames(ica.nc),drop=F]
-      res2$P <- res2$P[cont_vars, colnames(ica.nc),drop=F]
+      res2$r <- res2$r[vars, names(ica.nc)[-1],drop=F]
+      res2$P <- res2$P[vars, names(ica.nc)[-1],drop=F]
       
-      for (cv in cont_vars) { 
+      for (cv in vars) { 
         correlations[[cv]]$Rs[[nc_str]] <- res2$r[cv,]
         correlations[[cv]]$Pvals[[nc_str]] <- res2$P[cv,]
       }
+    } else if (is.categorical == TRUE){
+      discrete_var <- c(names(ica.nc), vars)
+      test_disc <- dplyr::select(test_vars, all_of(discrete_var)) %>%
+        drop_na()
+    
+      disp0 <- test_disc %>% dplyr::select(names(ica.nc)) %>% summarise(across(where(is.double), IQR))
+      dispgs <-  test_disc %>% dplyr::group_by(get(vars)) %>%
+        summarise(across(where(is.double), IQR)) %>% #get group variances
+        summarise(across(where(is.double), mean)) # compute mean var groups
+      
+      disp_ratio <- disp0/dispgs
+      
+      for (dv in vars) { 
+        correlations[[dv]]$Rs[[nc_str]] <- as.numeric(disp_ratio) %>% set_names(.,names(disp_ratio))
+        correlations[[dv]]$Pvals[[nc_str]] <- NULL
+      }
     }
+
     # Check the best IC and save it as a representative of the nc
-    for (cv in cont_vars){
+    for (cv in vars){
       best_c <- sort(abs(correlations[[cv]]$Rs[[nc_str]]),decreasing = T)[1] %>% names()
       to_plot %>% add_row(nc = nc_str,
                           var = cv,
@@ -183,13 +197,19 @@ Best_nc <- function(icas_list,
     }
     }
   
-  to_plot %>% group_by(nc) %>% summarise(meanR = mean(R)) %>% arrange(desc(meanR)) %>% dplyr::select(nc) -> order_bars
-  to_plot$nc %>% factor(order_bars$nc) -> to_plot$nc
-  to_plot %>%  ggplot(aes(x=nc, y=R, fill=var)) +
+  order_bars <- group_by(to_plot, nc) %>%
+    summarise(meanR = mean(R)) %>%
+    arrange(desc(meanR)) %>%
+    dplyr::select(nc)
+  
+  to_plot$nc <- to_plot$nc %>%
+    factor(order_bars$nc)
+  
+  to_plot %>% ggplot(aes(x=nc, y=R, fill=var)) +
     geom_bar(stat='identity', position=position_dodge()) +
     geom_text(aes(x = nc, y = 0.1, label = IC), angle = 90, position = position_dodge(width = 0.9)) +
     theme_minimal() +
-    ggtitle("ICA Space correlation with continuous variables")
+    ggtitle(paste0("ICA Space correlation with variable/s: ", paste(vars, sep = ", ")))
 }
 
 
@@ -302,7 +322,7 @@ ICA_explorator <- function(ica,
     for (var in df_disc){
       to_plot <- corr_disc %>%
         dplyr::select(names(A), all_of(var)) %>%
-        # pivot_longer(names(A)[-1], names_to = 'component', values_to = 'weight') %>%
+        pivot_longer(names(A)[-1], names_to = 'component', values_to = 'weight') %>%
         mutate_at(vars(component), ~(factor(., levels=names(A)[-1])))
       
       plot_list[[var]] <- to_plot %>% ggplot() + aes_string(color = var, x = var, y = "weight") +

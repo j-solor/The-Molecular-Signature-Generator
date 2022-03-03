@@ -87,7 +87,9 @@ Best_nc(icas_list,
         range.comp = 2:20,
         metadata = metadata_pdac_death,
         metadata_id = "bcr_patient_barcode",
-        cont_vars = c("OS.time", "PFI.time")) #! fix for when only one parameter is provided
+        #vars = "OS.time",
+        vars = "gender",
+        is.categorical = TRUE)
 ```
 Then we can check the graph and choose the best ICA space based in the number of components. In our case we are interested in a space where a single component represent the best these two variables. For that reason we chose the ICA space for nc = 18 components, where we are particularly interested in the IC. 17.
 
@@ -96,7 +98,7 @@ So we extract this ICA from the iteration we did.
 Once we now this we can check the distribution of the rest of variables across this space
 
 ```{r}
-elected_ncomp = 18
+elected_ncomp = 16
 elected_ncomp_str <- paste("nc", elected_ncomp, sep = "")
 
 best_ica <- list()
