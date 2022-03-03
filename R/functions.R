@@ -151,7 +151,7 @@ Best_nc <- function(icas_list,
   for (n.comp in range.comp) {
     nc_str <- paste("nc", n.comp, sep ="")
     ica.nc <- icas_list$A[[nc_str]] %>% as_tibble(rownames = "samples")
-    test_vars <- dplyr::rename(metadata, samples = all_of(metadata_id)) %>% inner_join(ica.nc)
+    test_vars <- dplyr::rename(metadata, samples = all_of(metadata_id)) %>% inner_join(ica.nc, by = "samples")
     
     if (is.categorical == FALSE){
       continuous_var <- c(names(ica.nc), vars)
