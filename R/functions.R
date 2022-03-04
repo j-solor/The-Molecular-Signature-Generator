@@ -290,7 +290,7 @@ ICA_explorator <- function(ica,
   returning_list[["cont"]] <- corr_cont %>%
     column_to_rownames(df_id) %>%
     formatted_cors("spearman") %>% #! adjust for conditional scaling
-    filter(measure1 %in% names(df), measure2 %in% names(A)) %>% #not square corr
+    filter(measure1 %in% names(A), measure2 %in% names(df)) %>% #not square corr
     ggplot(aes(measure1, measure2, fill=r, label=round(r_if_sig,2))) +
     geom_tile() +
     labs(x = NULL, y = NULL, fill = "Spearman's\nCorrelation", title= "ICA Sample weights correlations", 
