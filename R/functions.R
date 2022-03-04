@@ -280,7 +280,7 @@ ICA_explorator <- function(ica,
                              interest_IC = FALSE) {
   
   A <- as_tibble(ica[["A"]], rownames = df_id)
-  corr_values <- A %>% inner_join(df)
+  corr_values <- A %>% inner_join(df, by = df_id)
   returning_list <- list()
   # Continuous
   if (!any(is.na(df_cont))){
@@ -337,13 +337,83 @@ ICA_explorator <- function(ica,
   return(returning_list)
 }
 
-  
+
+
+
+Sampleweights_indepth <- function(ica,
+                                  interest_IC = FALSE,
+                                  df,
+                                  df_id = 0,
+                                  var,
+                                  test = NULL) {
+  A <- as_tibble(ica[["A"]], rownames = df_id)
+
+  to_test <- inner_join(A, df, by = df_id) %>% dplyr::select(df_id, all_of(interest_IC), all_of(var))
+  base_gg <- ggplot(data = to_test) +
+    aes_string(x = var, y = interest_IC)
+
+
+  # check assumptions
+  ## variable type
+  if (summarise_all(to_test, class) %>% dplyr::select(all_of(var)) == "numeric") {
+    vartype <- "continuous"
+  } else {
+    vartype <- "discrete"
+  }
+
+  ## normality
+  n.pv <- shapiro.test(to_test[, interest_IC, drop = T])$p.value
+  if (n.pv < 0.05) {
+    norm <- FALSE
+  } else {
+    norm <- TRUE
+  }
+
+  ## equal variance (fligner test as its better with non normality)
+  v.pv <- fligner.test(get(interest_IC) ~ get(var), data = to_test)$p.value
+  if (v.pv < 0.05) {
+    eqvar <- FALSE
+  } else {
+    eqvar <- TRUE
+  }
+
+
+  cat("Assumption check:\n")
+  cat(paste0("- var interpreted as: ", vartype, "\n"))
+  cat(paste0("- Normality: ", norm, "\n"))
+  cat(paste0("- Homoscedasticity: ", eqvar, "\n"))
+
+  if (vartype == "continuous" & !is.null(test)) {
+    to_test_df <- to_test %>% dplyr::select(df_id, all_of(interest_IC), all_of(var)) %>% column_to_rownames(df_id)
+    corr <- rcorr(x = data.matrix(to_test_df), type = test)
+    base_gg <- base_gg + ggtitle(paste0(interest_IC, " vs. ", var),
+                                 subtitle = paste0(test, " R: ", signif(corr$r[var,interest_IC], 2),", p-value = ", signif(corr$P[var,interest_IC], 2)))
+    
+  } else if (vartype == "discrete" & !is.null(test)) {
+    if (test == "ttest") {
+      stats <- t.test(get(interest_IC) ~ get(var), data = to_test, var.equal = eqvar)
+    } else if (test == "wilcox") {
+      stats <- wilcox.test(get(interest_IC) ~ get(var), data = to_test)
+    } else if (test == "anova") {
+      stats <- aov(get(interest_IC) ~ get(var), data = to_test)
+      stats$method <- "Analysis of variance"
+    } else if (test == "welch") {
+      stats <- oneway.test(get(interest_IC) ~ get(var), data = to_test)
+    } else if (test == "kruskal") {
+      stats <- kruskal.test(get(interest_IC) ~ get(var), data = to_test)
+    }
+
+    base_gg <- base_gg + ggtitle(paste0(interest_IC, " vs. ", var), subtitle = paste0(stats$method,": p-value = ", signif(stats$p.value, 2)))
+  }
+  return(base_gg)
+}
+  # 
   # ## Discrete
-  # corr_disc <- corr_values[,discrete_var] 
+  # corr_disc <- corr_values[,discrete_var]
   # 
   # test <- corr_disc %>% as_tibble(rownames = "samples") %>%
   #   pivot_longer(colnames(A), names_to = 'component', values_to = 'weight') %>%
-  #   pivot_longer(all_of(df_disc) ,'variable', 'value') 
+  #   pivot_longer(all_of(df_disc) ,'variable', 'value')
   # 
   # test %>% ggplot(aes(x = weight,y = value)) +
   #   geom_boxplot() + facet_grid(variable ~ component)
@@ -359,7 +429,7 @@ ICA_explorator <- function(ica,
   # for (i in df_disc){
   #   groups <- df[,i,drop = T] %>% unique()
   #   n_groups <- groups %>% length()
-  #   
+  # 
   #   # assumptions for t-test/1ANOVA
   #   ## normality
   #   for (g in groups) {
@@ -397,11 +467,11 @@ ICA_explorator <- function(ica,
   #     }
   #   }
   # 
-  #   
-  #   (base_gg + geom_violin(aes(fill = get(i)), position=position_dodge(0.8), width=0.5) + 
+  # 
+  #   (base_gg + geom_violin(aes(fill = get(i)), position=position_dodge(0.8), width=0.5) +
   #       geom_boxplot(aes(color = get(i)), position=position_dodge(0.8), width=0.1) +
   #       labs(fill = "values") +
-  #       theme_classic() + 
+  #       theme_classic() +
   #       #ggtitle(toupper(i)) +
   #       ggtitle(toupper(i), subtitle = paste(stats$method,signif(stats$p.value, 2))) +
   #       ylab("weight") +

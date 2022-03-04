@@ -87,9 +87,8 @@ Best_nc(icas_list,
         range.comp = 2:20,
         metadata = metadata_pdac_death,
         metadata_id = "bcr_patient_barcode",
-        #vars = "OS.time",
-        vars = "gender",
-        is.categorical = TRUE)
+        vars = "OS.time",
+        is.categorical = F)
 ```
 Then we can check the graph and choose the best ICA space based in the number of components. In our case we are interested in a space where a single component represent the best these two variables. For that reason we chose the ICA space for nc = 18 components, where we are particularly interested in the IC. 17.
 
@@ -98,7 +97,7 @@ So we extract this ICA from the iteration we did.
 Once we now this we can check the distribution of the rest of variables across this space
 
 ```{r}
-elected_ncomp = 16
+elected_ncomp = 18
 elected_ncomp_str <- paste("nc", elected_ncomp, sep = "")
 
 best_ica <- list()
@@ -110,7 +109,6 @@ best_ica[["samples"]] <- icas_list[["samples"]]
 Now its time to analyze the ICA space we have chosen. For that bthe first step is to plot the components distribution to discriminate those components that could be caused by outliers. If annotations are provided as a dataset (with the same sample order) one plot will be generated per column contrastimg their distribution compared to the component space. Make sure that your continuous labels are doubles!
 
 ```{r}
-#tbfixed
 annotations <- metadata_pdac_death %>%
   dplyr::select("bcr_patient_barcode", "OS.time", "gender") %>%
   column_to_rownames("bcr_patient_barcode")
@@ -176,11 +174,37 @@ tcga_decon <- read_rds("01_Input/TCGA_PAAD_curated_deconvolutions_m.RDS") %>%
 res <- Corr_by_ct(best_ica[["A"]], tcga_decon)
 ```
 
-We also offer an additional function to quickly explore any individual correlation you would like more indepth, specially related to the particular component IC.17. This is IC_test(), and can take continuous or discrete variables.
-
+We also offer an additional function to quickly explore any individual correlation you would like more indepth, specially related to the particular component IC.17. This is Sampleweights_indepth(), and can take continuous or discrete variables. it returns a ggplot object so you can choose to plot it as you like. You can use any ggplot function or strategy in these including coloring for additional factors
 ```{r}
-#! tbd
+ic17_gender <- Sampleweights_indepth(ica = best_ica,
+                      interest_IC = "IC.17",
+                      df = metadata_pdac_death,
+                      df_id = "bcr_patient_barcode",
+                      var = "gender",
+                      test = "ttest")
+
+ic17_gender + 
+  geom_violin(aes(fill = gender), position=position_dodge(0.8), width=0.5) +
+  geom_boxplot(position=position_dodge(0.8), width=0.1) +
+  theme_classic()
+
+  
 ```
+You can use any ggplot function or strategy in these including coloring for additional factors
+```{r}
+ic17_OS <- Sampleweights_indepth(ica = best_ica,
+                      interest_IC = "IC.17",
+                      df = metadata_pdac_death,
+                      df_id = "bcr_patient_barcode",
+                      var = "OS.time",
+                      test = "spearman")
+
+ic17_OS + geom_point() + geom_smooth(method=lm) +
+  scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_bw()
+
+```
+
 
 Its very important to check the gene weights of the component space, as it comes in thousands, not in hundreds like the samples. Directly testing these with ssGSEA, or just checking the 50 genes at each side of the tail can give a nice overview of what is behind of the component.
 
