@@ -157,8 +157,43 @@ clinical_data_plots$disc
 
 This function can take whatever kind of continuous/discrete data and compare it to your weights based in an id column. For instance you could use this to try to relate the space we have (and specially IC. 17) to the estimated activity of the 50% most variable TFs
 
-```{r}
-# Generate TF act of TCGA and do comparsion
+```{r,  fig.width=8, fig.height=15}
+library(dorothea)
+# Generate TF act 
+### Select the regulon data
+data(dorothea_hs_pancancer, package = "dorothea")
+regulons <- dorothea_hs_pancancer %>%
+  dplyr::filter(confidence %in% c("A", "B","C"))
+
+## VIPER
+minsize = 5
+ges.filter = FALSE
+
+tf_act__<- dorothea::run_viper(column_to_rownames(tcga, "gene"), regulons,
+                                          options =  list(minsize = minsize, eset.filter = ges.filter, 
+                                                          cores = 1, verbose = FALSE, nes = TRUE))
+
+# Format for analysis
+tf_act_ <- as_tibble(tf_act__, rownames = "TF") %>%
+  pivot_longer(cols = -TF, names_to = "bcr_patient_barcode") %>%
+  pivot_wider(id_cols = c(TF, bcr_patient_barcode), names_from = TF)
+
+# get 50 most variable
+tf_50_var <- summarise(tf_act_, across(where(is.double), var)) %>%
+  pivot_longer(cols = everything(), names_to = "TF", values_to = "var") %>%
+  dplyr::arrange(desc(var)) %>% dplyr::slice_head(n=50)
+
+tf_act <- tf_act_ %>% dplyr::select(bcr_patient_barcode, all_of(tf_50_var$TF))
+### find IC responsible
+TF_plots <- ICA_explorator(
+  ica = best_ica,
+  df = tf_act,
+  df_cont = tf_50_var$TF,
+  df_id = "bcr_patient_barcode",
+  plotfile = NA, 
+)
+
+TF_plots$cont
 ```
 
 As well, you could build special functions for analyzing other kind of data. For instance we implemented a special function to analyze the different deconvolution methods and signatures segregated by CT of the output of  the GemDeCan deconvolution package (https://github.com/VeraPancaldiLab/GEMDeCan/).
