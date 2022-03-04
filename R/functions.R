@@ -31,7 +31,19 @@ formatted_cors <- function(df, cor.stat){
 }
 
 
-# documentation to be done. Newer version in  CAFs Alexia analysis
+################################################################################
+#' Title
+#'@description
+#'
+#'@details
+#'
+#'
+#'@param param
+#'
+#'@return
+#'
+#'@examples
+
 
 Probes_to_whatever <- function(df, # dataset with ProbeIDs as rownames
                                annotation_table, # Bioconductor annotation table ie. AnnotationDbi::select(hgu219.db, probes, c("SYMBOL", "ENSEMBL", "GENENAME"))
@@ -67,11 +79,13 @@ Probes_to_whatever <- function(df, # dataset with ProbeIDs as rownames
   
   return(final_df)
 }
+################################################################################
 
-
-
-#' JADE ICA of a specific range of components
+################################################################################
+#' Iterative ICA
 #'@description
+#' Run ICA over a specific range of components
+#'@details
 #' `Range_ICA` returns a list of lists with the A (sample weights)
 #'  and S (gene weights) matrices of the specified range of components with 
 #'  100 as max iterations.
@@ -81,6 +95,10 @@ Probes_to_whatever <- function(df, # dataset with ProbeIDs as rownames
 #' 
 #'@param range.comp a range in the format n:n to specify 
 #'the range of number of components to analyze
+#'
+#'@return
+#'
+#'@examples
 
 Range_ICA <- function(df, range.comp) {
   A_mats <- list()
@@ -104,28 +122,44 @@ Range_ICA <- function(df, range.comp) {
   
   return(list("A" = A_mats, "S" = S_mats, "samples" = samples))
 }
+################################################################################
 
-
-
-
+################################################################################
+#'Find the best number of components
+#'
+#'@description
 #' Analyze the ICA with different number of components to extract the best
 #' related to a specific factors
-#'@description
-#' `Best_nc` takes the `Range_ICA` output and analyze it throughout
-#'the different range of components.
 #'
-#'prints a list of spearman correlations of the desired metadata factor
-#'with the IC that best correlate with it, from the ICAs with the different number of components 
+#'@details
+#' `Best_nc` takes the `Range_ICA` output and analyze it throughout
+#'the different range of components with respect to one or more than one variable.
+#'
+#'If the target variable is continuous spearman R is used to evaluate its association to the components
+#'
+#'Else, the ratio between the each component IQR and the mean of each component splitted by group IQRs
+#' is used for this purpose. This is needed given that A mtrix weights dont usually fullfill normality and homocaedasdicity assumptions
+#'
+#'
 #'
 #'@param icas_list output of `Range_ICA`
 #'@param range.comp a range in the format n:n to specify 
 #'the range of number of components
+#'@param metadata a tibble containing the variable/s to 
+#'associate and the id_column. Not restricted to only these.
+#'@param metadata_id a string indicating the name of the column 
+#'containing the sample identifier used when running `Range_ICA`
+#'@param vars a string indicating the variable for which you want
+#' to maximize the association. For discrete variables more than one 
+#' variable can be provided in form of a vector
+#'@param is.categorical boolean indicating wether the var provided is categorical.
+#'
+#'@return
+#'
+#'@examples
 #'
 #'TBD 
 #'- indpendence of range.ncomp
-#'- input of discrete variables (ttest, anova)
-#'- .tsv output to better choose
-#'
 
 Best_nc <- function(icas_list,
                           range.comp,
@@ -211,13 +245,20 @@ Best_nc <- function(icas_list,
     theme_minimal() +
     ggtitle(paste0("ICA Space correlation with variable/s: ", paste(vars, sep = ", ")))
 }
-
-
-
-
-##############################################################################
-#block of functions to analyze ICA analysis!
 ################################################################################
+
+################################################################################
+#'Title
+#'
+#'@description
+#'
+#'@details
+#'
+#'@param param
+#'
+#'@return
+#'
+#'@examples
 
 plot_sample_weights <- function(A_mat, annotations, plotfile = NA){
   stopifnot(rownames(A_mat) == rownames(annotations))
@@ -257,19 +298,20 @@ plot_sample_weights <- function(A_mat, annotations, plotfile = NA){
   }
   if (!is.na(plotfile)) {dev.off()}
 }
+################################################################################
 
-
-flattenCorrMatrix <- function(cormat, pmat) { #V
-  # ut <- upper.tri(cormat)
-  ut <- matrix(TRUE, nrow(cormat), ncol(cormat)) # mod to work with trimmed matrix
-  data.frame(
-    row = rownames(cormat)[row(cormat)[ut]],
-    # column = rownames(cormat)[col(cormat)[ut]],
-    column = colnames(cormat)[col(cormat)[ut]],  # mod to work with trimmed matrix
-    cor  =(cormat)[ut],
-    p = pmat[ut]
-  )
-}
+################################################################################
+#'Title
+#'
+#'@description
+#'
+#'@details
+#'
+#'@param param
+#'
+#'@return
+#'
+#'@examples
 
 ICA_explorator <- function(ica,
                              df,
@@ -336,10 +378,21 @@ ICA_explorator <- function(ica,
   }
   return(returning_list)
 }
+################################################################################
 
+################################################################################
 
-
-
+#'Title
+#'
+#'@description
+#'
+#'@details
+#'
+#'@param param
+#'
+#'@return
+#'
+#'@examples
 Sampleweights_indepth <- function(ica,
                                   interest_IC = FALSE,
                                   df,
@@ -407,124 +460,21 @@ Sampleweights_indepth <- function(ica,
   }
   return(base_gg)
 }
-  # 
-  # ## Discrete
-  # corr_disc <- corr_values[,discrete_var]
-  # 
-  # test <- corr_disc %>% as_tibble(rownames = "samples") %>%
-  #   pivot_longer(colnames(A), names_to = 'component', values_to = 'weight') %>%
-  #   pivot_longer(all_of(df_disc) ,'variable', 'value')
-  # 
-  # test %>% ggplot(aes(x = weight,y = value)) +
-  #   geom_boxplot() + facet_grid(variable ~ component)
-  # 
-  # if (interest_IC == FALSE){
-  #   corr_disc.m <- melt(corr_disc, measure.vars = paste("IC", 1:elected_ncomp, sep = "."))
-  # } else {
-  #   corr_disc.m <- melt(corr_disc, measure.vars = interest_IC)
-  # }
-  # ### boxplots (+ stat significance) # STATS ONLY WORK WHEN interest_IC == TRUE!!!!!!
-  # base_gg <- ggplot(data = corr_disc.m, aes(x=variable, y=value))
-  # 
-  # for (i in df_disc){
-  #   groups <- df[,i,drop = T] %>% unique()
-  #   n_groups <- groups %>% length()
-  # 
-  #   # assumptions for t-test/1ANOVA
-  #   ## normality
-  #   for (g in groups) {
-  #     n.pv = with(corr_disc.m, shapiro.test(value[get(i) == g]))$p.value
-  #     if (n.pv < 0.05){norm = FALSE; break} else {norm = TRUE}
-  #   }
-  # 
-  #   ## equal variance (fligner test as its better with non normality)
-  #   v.pv = fligner.test(value ~ get(i), data = corr_disc.m)$p.value
-  #   if (v.pv < 0.05){eqvar = FALSE} else {eqvar = TRUE}
-  # 
-  #   print(c(i,g,norm,eqvar))
-  #   # test choice
-  #   ## 2 groups
-  #   if (n_groups < 3){
-  #     if (all.equal(norm, eqvar, TRUE) == TRUE){
-  #       stats <- t.test(value ~ get(i), data = corr_disc.m, var.equal = TRUE)
-  #     } else if(eqvar == TRUE) {
-  #       stats <- wilcox.test(value ~ get(i), data = corr_disc.m)
-  #     } else {
-  #       stats <- kruskal.test(value ~ get(i), data = corr_disc.m) # no need for equal variance nor normality
-  #     }
-  #   }
-  # 
-  #   ## 3 or more groups
-  #   else {
-  #     if (all.equal(norm, eqvar, TRUE) == TRUE){
-  #       stats <- aov(value ~ get(i), data = corr_disc.m)
-  # 
-  #     } else if(norm == TRUE) {
-  #       stats <- oneway.test(value ~ get(i), data = corr_disc.m)
-  # 
-  #     } else {
-  #       stats <- kruskal.test(value ~ get(i), data = corr_disc.m)
-  #     }
-  #   }
-  # 
-  # 
-  #   (base_gg + geom_violin(aes(fill = get(i)), position=position_dodge(0.8), width=0.5) +
-  #       geom_boxplot(aes(color = get(i)), position=position_dodge(0.8), width=0.1) +
-  #       labs(fill = "values") +
-  #       theme_classic() +
-  #       #ggtitle(toupper(i)) +
-  #       ggtitle(toupper(i), subtitle = paste(stats$method,signif(stats$p.value, 2))) +
-  #       ylab("weight") +
-  #       xlab("component")) %>% print()
-  # }
-  
-  
-  # Detailed samplemaps
-  # for (ann in colnames(df)[-1]) {
-  #   print(ann)
-  #   rug_aes <- df[,ann]
-  #   rug_name <- ann
-  #   lapply(colnames(A), function(ic) {
-  #     print(ic)
-  #     p <-
-  #       ggplot(A) +
-  #       aes_string(ic) +
-  #       labs(title = paste(ic, ann, sep = "_")) +
-  #       theme_classic() +
-  #       theme(
-  #         axis.text.y = element_blank(),
-  #         axis.ticks.y = element_blank()
-  #       )
-  # 
-  #     if (ann %in% df_cont) {
-  #       p <- p + geom_density() +
-  #         geom_rug(aes(color = rug_aes)) +
-  #         scale_colour_gradientn(colours = terrain.colors(10), na.value = NA) +
-  #         guides(color = guide_colourbar())
-  #     }
-  # 
-  #     if (ann %in% df_disc) {
-  #       p <- p + geom_density() +
-  #         geom_rug(aes(color = rug_aes)) +
-  #         theme(axis.title.y = element_blank())
-  #     }
-  #     p_dir <- paste(plot_dir, analysis_name, ic , "", sep = "/")
-  #     dir.create(p_dir)
-  #     print(p_dir)
-  #     ggsave(
-  #       filename = paste(p_dir, ann, ".pdf", sep = ""),
-  #       plot = p, width = 10, height = 5
-  #     )
-  #   })
-  # }
-  # }
+################################################################################
 
+################################################################################
+#'Title
+#'
+#'@description
+#'
+#'@details
+#'
+#'@param param
+#'
+#'@return
+#'
+#'@examples
 
-
-
-
-
-# Cell type segregated Deconvolution
 Corr_by_ct <- function(A, decon){
   A <- as.data.frame(A)
   dir.create("02_Output/deconv_by_ct/")
@@ -712,9 +662,20 @@ Corr_by_ct <- function(A, decon){
   }
   return(decon_by_ct)
 }
+################################################################################
 
-
-# Gene weights
+################################################################################
+#'Title
+#'
+#'@description
+#'
+#'@details
+#'
+#'@param param
+#'
+#'@return
+#'
+#'@examples
 
 Explore_GW <- function(S_sym, S_ensembl, elected_ncomp, interest_IC){
   
@@ -783,12 +744,20 @@ Explore_GW <- function(S_sym, S_ensembl, elected_ncomp, interest_IC){
   
   return(gsvaTop)
 }
+################################################################################
 
-##  enrichmentfun: enrichmentfun function to apply enrichiment analysis on data refering to a set of markers
-##  authors : Yasmina K, Yuna B and Magali R
-##  arguments : x: dataframe with nr: nrow (genes) and nc : ncolumn (componenent, cells, patients...), markerscelltypes: a list of cell markers
-##  example of use : MyEnrichExp = enrichmentfun(mtx, SetOfMarker)
-
+################################################################################
+#'Title
+#'
+#'@description
+#'
+#'@details
+#'
+#'@param param
+#'
+#'@return
+#'
+#'@examples
 
 enrichmentfun = function(x, markerscelltypes){
     fgseaResall <- apply(x, 2, function(x,mcell=markerscelltypes){
@@ -804,3 +773,4 @@ enrichmentfun = function(x, markerscelltypes){
         return(fgseaResDFtab)
     })
 }
+################################################################################
