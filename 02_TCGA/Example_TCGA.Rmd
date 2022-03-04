@@ -188,10 +188,6 @@ ic17_gender +
   geom_boxplot(position=position_dodge(0.8), width=0.1) +
   theme_classic()
 
-  
-```
-You can use any ggplot function or strategy in these including coloring for additional factors
-```{r}
 ic17_OS <- Sampleweights_indepth(ica = best_ica,
                       interest_IC = "IC.17",
                       df = metadata_pdac_death,
@@ -201,6 +197,18 @@ ic17_OS <- Sampleweights_indepth(ica = best_ica,
 
 ic17_OS + geom_point() + geom_smooth(method=lm) +
   scale_colour_gradientn(colours = terrain.colors(10)) +
+  theme_bw()
+
+```
+You can use any ggplot function or strategy in these including coloring for additional factors
+```{r}
+ic17_OS <- Sampleweights_indepth(ica = best_ica,
+                      interest_IC = "IC.17",
+                      df = metadata_pdac_death,
+                      df_id = "bcr_patient_barcode",
+                      var = "OS.time")
+
+ic17_OS + geom_point(aes(color = gender)) + geom_smooth(aes(color = gender), method=lm, se = F) +
   theme_bw()
 
 ```

@@ -348,7 +348,7 @@ Sampleweights_indepth <- function(ica,
                                   test = NULL) {
   A <- as_tibble(ica[["A"]], rownames = df_id)
 
-  to_test <- inner_join(A, df, by = df_id) %>% dplyr::select(df_id, all_of(interest_IC), all_of(var))
+  to_test <- inner_join(A, df, by = df_id)
   base_gg <- ggplot(data = to_test) +
     aes_string(x = var, y = interest_IC)
 
