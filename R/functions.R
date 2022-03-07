@@ -7,11 +7,12 @@ suppressPackageStartupMessages({
   library(reshape2)
   library(scales) #! create my own scales::rescale function?
   library(ggpubr) 
+  library(ggplotify)
   library(patchwork)
 })
 ################################################################################
 
-# Customizable corrplot (modified from https://www.khstats.com/blog/corr-plots/corr-plots/)
+# Customizable corrplot functions (modified from https://www.khstats.com/blog/corr-plots/corr-plots/)
 cors <- function(df, cor.stat) {
   M <- Hmisc::rcorr(as.matrix(df), type = cor.stat)
   Mdf <- map(M, ~data.frame(.x))
@@ -33,7 +34,7 @@ formatted_cors <- function(df, cor.stat){
 
 ################################################################################
 #' Title
-#'@description
+#'@description 
 #'
 #'@details
 #'
@@ -759,18 +760,31 @@ Explore_GW <- function(S_sym, S_ensembl, elected_ncomp, interest_IC){
 #'
 #'@examples
 
-enrichmentfun = function(x, markerscelltypes){
-    fgseaResall <- apply(x, 2, function(x,mcell=markerscelltypes){
-        genes=sort(x,decreasing=T)
-        fgseaRes = fgseaSimple(mcell, genes, minSize=1, maxSize=2000, nperm=1000, scoreType = "pos")
-        fgseaResDF = data.frame(fgseaRes)
-        fgseaResDF. = fgseaResDF[,c("pval", "padj", "ES")]
-        rownames(fgseaResDF.) = fgseaResDF$pathway
-        fgseaResDF.$pvalpositiveES = ifelse(fgseaResDF.[,"ES"]>0, fgseaResDF.$pval, 1)
-        fgseaResDF.$padjpositiveES = ifelse(fgseaResDF.[,"ES"]>0, fgseaResDF.$padj, 1)
-        fgseaResDF.list <- setNames(split(fgseaResDF., seq(nrow(fgseaResDF.))), rownames(fgseaResDF.))
-        fgseaResDFtab = do.call(cbind, fgseaResDF.list)
-        return(fgseaResDFtab)
-    })
-}
+PlotGeneWeights <- function(ica, expression, df_id, n_genes, column_annotation = NA, interest_IC){
+  return_plots <- list()
+  
+  S <- as_tibble(ica[["S"]], rownames = df_id)
+  S_sort <- arrange(S, get(interest_IC))
+  S_mneg <- head(S_sort, n_genes)
+  S_mpos <- tail(S_sort, n_genes)
+  
+  return_plots[["densplot"]] <- ggplot(S) +
+    aes_string(y = interest_IC) +
+    geom_density(alpha=.5, fill="#AED3FA") +
+      geom_hline(yintercept = 0, colour = "black") +
+      geom_hline(yintercept = max(S_mneg[interest_IC]), colour = "#7DB0DD", linetype = "dashed") + 
+      geom_hline(yintercept = min(S_mpos[interest_IC]), colour = "#EAAFBB", linetype = "dashed") + 
+      theme_classic()
+
+    tibble(name = S_mneg[[df_id]], class = "most negative") %>% add_row(name = S_mpos[[df_id]], class = "most possitive") %>% column_to_rownames("name") -> annot_row 
+    
+    return_plots[["heatmap"]] <- dplyr::filter(expression, get(df_id) %in% rownames(annot_row)) %>%
+      dplyr::arrange(match(get(df_id), rownames(annot_row))) %>%
+      column_to_rownames(df_id) %>% 
+      pheatmap(scale = "row", annotation_row = annot_row, cluster_rows = F, 
+               annotation_col = column_annotation) %>% as.ggplot()
+    dev.off()
+    
+    return(return_plots)
+  }
 ################################################################################

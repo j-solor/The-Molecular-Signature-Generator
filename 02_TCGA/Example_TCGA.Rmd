@@ -10,7 +10,7 @@ library(org.Hs.eg.db)
 library(AnnotationDbi)
 
 setwd("/home/jacobo/Documents/05_DeconvolutionReview/02_TCGA/")
-source(file = "/home/jacobo/Documents/05_DeconvolutionReview/R/functions.R" )
+source(file = "/home/jacobo/Documents/05_DeconvolutionReview/R/functions.R")
 ```
 
 Then we load the data and metadata, with some filtering in the metadata too.
@@ -44,14 +44,14 @@ to_keep <- dplyr::filter(annot, !grepl('X|Y', MAP)) %>%
   dplyr::select("SYMBOL") %>%
   distinct()
 
-tcga_ <- dplyr::filter(tcga, gene %in% to_keep$SYMBOL)
+tcga_gn <- dplyr::filter(tcga, gene %in% to_keep$SYMBOL)
 ```
 
 #2 Mean center genewise and selection of half most variable genes. Finally save an .RDS object as a checkpoint
 
 ```{r}
 
-tcga__ <- tcga_ %>% pivot_longer(-gene, 'variable', 'value') %>%
+tcga__ <- tcga_gn %>% pivot_longer(-gene, 'variable', 'value') %>%
   pivot_wider(variable, gene) %>%
   mutate(across(where(is.numeric), ~ . - mean(.))) %>%
   pivot_longer(-variable, 'gene', 'value') %>% 
@@ -84,7 +84,7 @@ This is done with the Best_nc() function
 
 ```{r}
 Best_nc(icas_list,
-        range.comp = 2:20,
+        range.comp = 2:20, #! remove this argument
         metadata = metadata_pdac_death,
         metadata_id = "bcr_patient_barcode",
         vars = "OS.time",
@@ -147,11 +147,11 @@ clinical_data_plots <- ICA_explorator(
 ```
 
 This Function returns a list containing 2 ggplot objects you can manipulate to save as you desire
-```{r,  fig.width=5, fig.height=6}
+```{r,  fig.width=10, fig.height=3}
 clinical_data_plots$cont  
 ```
 
-```{r,  fig.width=10, fig.height=8}
+```{r, fig.width=10, fig.height=8}
 clinical_data_plots$disc
 ```
 
@@ -199,7 +199,7 @@ TF_plots$cont
 As well, you could build special functions for analyzing other kind of data. For instance we implemented a special function to analyze the different deconvolution methods and signatures segregated by CT of the output of  the GemDeCan deconvolution package (https://github.com/VeraPancaldiLab/GEMDeCan/).
 
 
-```{r}
+```{r, fig.width=10, fig.height=8}
 # need to fix!
 tcga_decon <- read_rds("01_Input/TCGA_PAAD_curated_deconvolutions_m.RDS") %>%
   as_tibble(rownames = "samples") %>% 
@@ -249,8 +249,45 @@ ic17_OS + geom_point(aes(color = gender)) + geom_smooth(aes(color = gender), met
 ```
 
 
-Its very important to check the gene weights of the component space, as it comes in thousands, not in hundreds like the samples. Directly testing these with ssGSEA, or just checking the 50 genes at each side of the tail can give a nice overview of what is behind of the component.
+Its very important to check the gene weights of the component space, as it comes in thousands, not in hundreds like the samples. Directly testing these with ssGSEA, or just checking the 50 genes at each side of the tail can give a nice overview of what is behind of the component. For that we provide the function PlotGeneWeights. The functions return two plots on a list, so you can modify or orgize it as you want.
 
-```{r}
-#! import from bootstrap
+```{r, fig.width=10, fig.height=8}
+gw <- PlotGeneWeights(ica = best_ica,
+                      expression = tcga_gn,
+                      df_id = "gene",
+                      n_genes  = 25,
+                      column_annotation = NA,
+                      interest_IC = "IC.17")
+
+ggarrange(gw[["densplot"]] + rremove("xylab"), gw[["heatmap"]], heights = c(1.5, 10), widths = c(0.2,1),
+          labels = c("A", "B"),
+          ncol = 2, nrow = 1)
+```
+
+Its also recomended to perform in these supervised dimensionality reduction techniques as GSVA. Here is an example checking IC.17
+
+```{r, fig.width=10, fig.height=8}
+library(msigdbr)
+library(GSVA)
+
+all_genesets <- msigdbr("Homo sapiens")
+use_genesets <- dplyr::filter(all_genesets, gs_cat %in% c("H", "C2"))
+msigdbr_list <- split(x = use_genesets$gene_symbol, f = use_genesets$gs_name)
+msigdb_descriptions <- use_genesets[c("gs_name", "gs_description")] %>%
+  unique() %>% column_to_rownames("gs_name")
+
+gsvaRes <- gsva(data.matrix(best_ica$S), msigdbr_list, min.sz = 15)
+
+# best for IC.17
+gsvaTop <- as_tibble(gsvaRes, rownames = "gs_name") %>%  mutate(the_rank = rank(IC.17, ties.method = "random")) %>% 
+  dplyr::filter(the_rank < 26 | the_rank > (nrow(gsvaRes)-26)) %>% 
+  dplyr::mutate(gs_name = fct_reorder(gs_name, IC.17)) %>% mutate(sign = case_when(IC.17 < 0 ~ "neg", IC.17 > 0 ~ "pos")) %>%
+  dplyr::select(gs_name, IC.17, sign)
+
+ggplot(gsvaTop, aes(x = IC.17, y = gs_name, color = sign)) + 
+  geom_point() +
+  ggtitle("Best H and C2 gene sets IC.17") +
+  theme_bw() +
+  rremove("legend") +
+  rremove("ylab")
 ```
