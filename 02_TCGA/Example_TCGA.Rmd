@@ -76,7 +76,7 @@ This is done with the Range_ICA() function
 
 ```{r}
 tcga_p <- read_rds("01_Input/tcga_icaready.RDS")
-icas_list <- column_to_rownames(tcga_p, "gene") %>% Range_ICA(2:20)
+icas_list <- Range_ICA(tcga_p, "gene", 2:20)
 ```
 
 Once we have the list of components we can start the component analysis. This time want to see the best component representing "OS.time" and "PFI.time" of just the patients with a confirmed PDAC caused dead.
@@ -110,11 +110,11 @@ Now its time to analyze the ICA space we have chosen. For that bthe first step i
 
 ```{r}
 annotations <- metadata_pdac_death %>%
-  dplyr::select("bcr_patient_barcode", "OS.time", "gender") %>%
-  column_to_rownames("bcr_patient_barcode")
+  dplyr::select("bcr_patient_barcode", "OS.time", "gender")
 
-plot_sample_weights(A_mat = best_ica[["A"]],
-                    annotations = annotations)
+Sampleweights_distribution(ica = best_ica,
+                    df = annotations,
+                    df_id = "bcr_patient_barcode")
 ```
 Now its the time to check the whole component space. For that we implemented a default function named ICA_explorator() to generate correlation plots with the data of your choice. We recommend to do a first test with the technical information available, as ICA can easily pick this kind of variability into a component.
 
@@ -141,9 +141,8 @@ clinical_data_plots <- ICA_explorator(
   df = metadata_pdac_death,
   df_cont = metadata_cont,
   df_disc = metadata_disc,
-  df_id = "bcr_patient_barcode",
-  plotfile = NA, 
-) #! remove warning NANs when plotting R in correlogram
+  df_id = "bcr_patient_barcode")
+
 ```
 
 This Function returns a list containing 2 ggplot objects you can manipulate to save as you desire
@@ -189,14 +188,12 @@ TF_plots <- ICA_explorator(
   ica = best_ica,
   df = tf_act,
   df_cont = tf_50_var$TF,
-  df_id = "bcr_patient_barcode",
-  plotfile = NA, 
-)
+  df_id = "bcr_patient_barcode")
 
 TF_plots$cont
 ```
 
-As well, you could build special functions for analyzing other kind of data. For instance we implemented a special function to analyze the different deconvolution methods and signatures segregated by CT of the output of  the GemDeCan deconvolution package (https://github.com/VeraPancaldiLab/GEMDeCan/).
+As well, you could build special functions for analyzing other kind of data. For instance we implemented a special function to analyze the different deconvolution methods and signatures segregated by CT of the output of  the GemDeCan deconvolution package (https://github.com/VeraPancaldiLab/GEMDeCan/). TO BE FIXED
 
 
 ```{r, fig.width=10, fig.height=8}
@@ -253,11 +250,11 @@ Its very important to check the gene weights of the component space, as it comes
 
 ```{r, fig.width=10, fig.height=8}
 gw <- PlotGeneWeights(ica = best_ica,
+                      interest_IC = "IC.17",
                       expression = tcga_gn,
                       df_id = "gene",
                       n_genes  = 25,
-                      column_annotation = NA,
-                      interest_IC = "IC.17")
+                      column_annotation = NA)
 
 ggarrange(gw[["densplot"]] + rremove("xylab"), gw[["heatmap"]], heights = c(1.5, 10), widths = c(0.2,1),
           labels = c("A", "B"),

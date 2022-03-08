@@ -11,7 +11,6 @@ suppressPackageStartupMessages({
   library(patchwork)
 })
 ################################################################################
-
 # Customizable corrplot functions (modified from https://www.khstats.com/blog/corr-plots/corr-plots/)
 cors <- function(df, cor.stat) {
   M <- Hmisc::rcorr(as.matrix(df), type = cor.stat)
@@ -30,78 +29,40 @@ formatted_cors <- function(df, cor.stat){
            p_if_sig = ifelse(sig_p, p, NA),
            r_if_sig = ifelse(sig_p, r, NA)) 
 }
-
-
-################################################################################
-#' Title
-#'@description 
-#'
-#'@details
-#'
-#'
-#'@param param
-#'
-#'@return
-#'
-#'@examples
-
-
-Probes_to_whatever <- function(df, # dataset with ProbeIDs as rownames
-                               annotation_table, # Bioconductor annotation table ie. AnnotationDbi::select(hgu219.db, probes, c("SYMBOL", "ENSEMBL", "GENENAME"))
-                               new_IDs # Desired IDs ("SYMBOL", "ENSEMBL", "GENENAME")
-)
-  #TBI: choose function of aggregation, choose starting format, choose 
-{
-  final_df <- merge(df,annotation_table, by.x=0, by.y="PROBEID")
-  
-  # Stats of conversion
-  non_agg <- nrow(final_df)
-  non_agg_uniq <- length(unique(final_df[new_IDs]))
-  non_agg_nas <- sum(is.na(final_df[new_IDs]))
-  non_agg_nonas <- non_agg-non_agg_nas
-  
-  # Conversion
-  final_df <- aggregate(final_df,
-                        final_df[new_IDs],
-                        FUN = mean) %>% 
-    column_to_rownames(new_IDs) %>% 
-    subset(select = -c(Row.names, SYMBOL, GENENAME, ENSEMBL))
-  
-  agg <- nrow(final_df)
-  
-  print(paste(100*(non_agg-agg)/non_agg,
-              "% of the originally merged df have been agregated/removed"))
-  
-  print(paste(100*(non_agg_nas)/non_agg,
-              "% of the originally merged df have been removed due no", new_IDs))
-  
-  print(paste(100*(non_agg_nonas - agg)/non_agg,
-              "% of the non NAs df have been aggregated"))
-  
-  return(final_df)
-}
 ################################################################################
 
 ################################################################################
 #' Iterative ICA
 #'@description
-#' Run ICA over a specific range of components
-#'@details
-#' `Range_ICA` returns a list of lists with the A (sample weights)
-#'  and S (gene weights) matrices of the specified range of components with 
-#'  100 as max iterations.
-#'
-#'@param df expression dataframe with sample names in columns
-#' and genes/probes in rows 
+#' `Range_ICA` runs ICA over the specified number of components in order to
+#'  later explore them.
 #' 
-#'@param range.comp a range in the format n:n to specify 
-#'the range of number of components to analyze
+#'@usage 
+#'\code{Range_ICA(df, range.comp = 2:20)}
 #'
+#'@param expression tibble with sample names in columns and genes/probes in
+#' rows. Should be mean centered and fairly filtered.  
+#' 
+#'@param df_id name of the column containing the gene ids
+#' 
+#'@param range.comp a range in the format n:n to specify the range of number of 
+#'components to analyze. Not recomended to use more than 20 components. 
+#'Specially with small datasets.
+#'
+#'@details
+#' `Range_ICA` uses JADE algorithm with a maximum of 100 iterations to 
+#' converge as ICA implementation.
 #'@return
+#' `Range_ICA` returns a list of lists with the A (sample weights)
+#'  and S (gene weights) matrices of the specified range.comp
 #'
 #'@examples
+#'
 
-Range_ICA <- function(df, range.comp) {
+Range_ICA <- function(expression, df_id, range.comp = 2:20) {
+  
+  df <- column_to_rownames(expression, df_id)
+  
   A_mats <- list()
   S_mats <- list()
   samples <- colnames(df)
@@ -130,37 +91,55 @@ Range_ICA <- function(df, range.comp) {
 #'
 #'@description
 #' Analyze the ICA with different number of components to extract the best
-#' related to a specific factors
+#' related to one or more variables.
+#'
+#'@usage 
+#'\code{Best_nc(icas_list, range.comp, metadata, metadata_id = 0, vars, is.categorical = FALSE)}
+#'
+#'@param icas_list output of `Range_ICA`
+#'
+#'@param range.comp a range in the format n:n to specify 
+#'the range of number of components
+#'
+#'@param metadata a tibble containing the `vars` to associate and the
+#' `metadata_id` column. Not restricted to only these.
+#'
+#'@param metadata_id a string indicating the name of the column 
+#'containing the sample identifier used when running `Range_ICA`.
+#'
+#'@param vars a string/char vector indicating the variable/s for which you want
+#' to maximize the association. For continuous variables more than one 
+#' variable can be provided in form of a vector.
+#' 
+#'@param is.categorical boolean indicating whether the `var` provided is
+#' categorical.
 #'
 #'@details
 #' `Best_nc` takes the `Range_ICA` output and analyze it throughout
-#'the different range of components with respect to one or more than one variable.
+#'the different range of components  of each ICA analysis with respect to one or
+#' more than one variable. The most associated component for each variable is 
+#' selected as the representative of the number of components.
 #'
-#'If the target variable is continuous spearman R is used to evaluate its association to the components
+#'If the target variable/s are continuous, spearman R is used to evaluate their
+#'association.
 #'
-#'Else, the ratio between the each component IQR and the mean of each component splitted by group IQRs
-#' is used for this purpose. This is needed given that A mtrix weights dont usually fullfill normality and homocaedasdicity assumptions
-#'
-#'
-#'
-#'@param icas_list output of `Range_ICA`
-#'@param range.comp a range in the format n:n to specify 
-#'the range of number of components
-#'@param metadata a tibble containing the variable/s to 
-#'associate and the id_column. Not restricted to only these.
-#'@param metadata_id a string indicating the name of the column 
-#'containing the sample identifier used when running `Range_ICA`
-#'@param vars a string indicating the variable for which you want
-#' to maximize the association. For discrete variables more than one 
-#' variable can be provided in form of a vector
-#'@param is.categorical boolean indicating wether the var provided is categorical.
+#'Else, the ratio between the each component Inter quartile range (IQR) and the
+#' mean of each component splited by group IQRs is used for this purpose. This 
+#'is needed given that sample weights (A matrix) don't usually fulfill normality
+#'and homoscedasticity assumptions needed for most parametric tests. 
+#'(CURRENTLY UNDER TESTING)
 #'
 #'@return
-#'
+#' `Best_nc` returns a ggplot barplot ordered by the mean association of the 
+#' number of components with the `vars` of your choice. ggplot syntax can be
+#'used to directly alter or export the resulting plot.
+#' 
 #'@examples
 #'
-#'TBD 
+#'@TBD 
 #'- indpendence of range.ncomp
+#'- output the ggplot and let them do the choice of plot
+#'- option to order or not the results
 
 Best_nc <- function(icas_list,
                           range.comp,
@@ -244,35 +223,64 @@ Best_nc <- function(icas_list,
     geom_bar(stat='identity', position=position_dodge()) +
     geom_text(aes(x = nc, y = 0.1, label = IC), angle = 90, position = position_dodge(width = 0.9)) +
     theme_minimal() +
-    ggtitle(paste0("ICA Space correlation with variable/s: ", paste(vars, sep = ", ")))
+    ggtitle(paste0("ICA Space correlation with variable/s: ", paste(vars, sep = ", "))) +
+    rotate_x_text() +
+    rremove("xlab")
 }
 ################################################################################
 
 ################################################################################
-#'Title
+#'Explore sample weights distributions
 #'
 #'@description
+#'`Sampleweights_distribution` explores the component space sample weight in detail to 
+#'check the distribution of sample weights with respect to some variables.
+#'This can give a clue on what a component is detecting
+#'(binary classification, outliers ...).
+#'
+#'@usage 
+#'\code{Sampleweights_distribution(ica, df, df_id, plotfile = NA)}
+#'
+#'@param ica output of JADE
+#'
+#'@param df tibble containing the `df_id` and the variables to be tested
+#'
+#'@param df_id string indicating the name of the `df` sample id column 
+#'
+#'@param plotfile string indicating the path and name to the pdf where the 
+#'function should export the plots. If not provided it will use stdout.
 #'
 #'@details
-#'
-#'@param param
+#'`Sampleweights_distribution` will plot the sample weights with respect to the desired 
+#'variables included in the `df`. For automatic selection of the best 
+#'color scale possible ensure your columns are coded according to their content 
+#'(continuous as numeric).
 #'
 #'@return
+#'`Sampleweights_distribution`  will return a plot per column of the `df`.
 #'
 #'@examples
+#'
+#'#'@TBD 
+#'- availability of choosing the vars like the other functions
+#'- independence of ggarrange
 
-plot_sample_weights <- function(A_mat, annotations, plotfile = NA){
-  stopifnot(rownames(A_mat) == rownames(annotations))
+Sampleweights_distribution <- function(ica, df, df_id, plotfile = NA){
+  
+  A <- as_tibble(ica[["A"]], rownames = df_id)
+  
+  stopifnot("identifiers must mach between the df and the ica object" = all(A[[df_id]] == df[[df_id]]))
+
   if (!is.na(plotfile)){pdf(file=paste(plotfile, ".pdf", sep=""))}
   
   # Sample weights
-  for (ann in colnames(annotations)){
+  for (ann in dplyr::select(df, -all_of(df_id)) %>% names()){
     
-    rug_aes <- annotations[[ann]]
+    rug_aes <- df[[ann]]
     rug_name <- ann
-    comps_plots <- lapply(colnames(A_mat), function(ic){
+    comps_plots <- lapply(colnames(A[-1]), function(ic){
       p <- 
-        ggplot(data.frame(A_mat)) +
+        ggplot(A) +
         aes_string(ic) +
         geom_density() + 
         geom_rug(aes(color = rug_aes), length = unit(0.1, "npc")) +
@@ -294,33 +302,63 @@ plot_sample_weights <- function(A_mat, annotations, plotfile = NA){
       p
       
     })
-    ggarrange(plotlist = comps_plots, common.legend = T,  legend = "bottom") %>% annotate_figure(
-      top = text_grob(ann, color = "black", face = "bold", size = 14), ) %>% print()
+    ggarrange(plotlist = comps_plots, common.legend = T,  legend = "bottom") %>% 
+      annotate_figure(top = text_grob(ann, color = "black", face = "bold", size = 14)) %>% 
+      print()
   }
   if (!is.na(plotfile)) {dev.off()}
 }
+
 ################################################################################
 
 ################################################################################
-#'Title
+#'Explore the components of an ICA
 #'
 #'@description
+#'`ICA_explorator` allows the exploration of the component space as a whole, 
+#'checking separately the continuous and discrete variables to evaluate the
+#'components for associations to whatever metadata or analysis results provided.
+#'
+#'@usage 
+#'\code{ICA_explorator(ica, df, df_cont = NA, df_disc = NA, df_id)}
+#'
+#'@param ica output of JADE
+#'
+#'@param df tibble containing the `df_id` and the variables to be tested
+#'
+#'@param df_cont string or character vector containing the variables you want to
+#' test as continuous. Should be column names of `df`.
+#' 
+#'@param df_disc string or character vector containing the variables you want to
+#' test as discrete Should be column names of `df`.
+#' 
+#'@param df_id string indicating the column name containing the sample ids of
+#' `df`.
 #'
 #'@details
-#'
-#'@param param
+#'`ICA_explorator` will compute different plots depending in whether `df_cont` 
+#'and/or `df_disc` are provided. When only one is it will avoid the calculation 
+#'of the absent. For `df_cont` Spearman correlation coeficients are computed.
+#'For `df_disc` the sample weights of each component are standarized and 
+#'represented as the y axis
 #'
 #'@return
-#'
+#'`ICA_explorator` will return a list containing one or two ggplot objects that
+#' can be easily toggled afterwards using ggplot sintax to match the desired 
+#' format. 
+#' 
 #'@examples
+#'
+#'@TBD
+#'- remove warning NANs when plotting R in correlogram
+#'- clean undesired output to stdout
+#'- fix ordering of the components TFs
 
 ICA_explorator <- function(ica,
                              df,
                              df_cont = NA,
                              df_disc = NA,
-                             df_id = 0, # 0 for rownmaes, otherwise put the colname
-                             plotfile = NA, # Define the path and prefix of the file to be created if wnated
-                             interest_IC = FALSE) {
+                             df_id) {
   
   A <- as_tibble(ica[["A"]], rownames = df_id)
   corr_values <- A %>% inner_join(df, by = df_id)
@@ -344,12 +382,6 @@ ICA_explorator <- function(ica,
     scale_x_discrete(expand=c(0,0)) +
     scale_y_discrete(expand=c(0,0)) + 
     ggpubr::rotate_x_text(angle = 90)
-  
-  if (!is.na(plotfile)){
-    ggsave(coerrelogram, paste0(plotfile, "cont.pdf"), dpi = "print", width = 210, height = 150, units = "mm", scale = 1.25) #! adjust scale and implement auto scale
-    } else {
-    #print(coerrelogram)
-    }
   }
 
 
@@ -383,19 +415,60 @@ ICA_explorator <- function(ica,
 
 ################################################################################
 
-#'Title
+#'Analyze a component sample weights indepth
 #'
 #'@description
+#'`Sampleweights_indepth` allows the testing of a specific component with 
+#'relation to a variable.
 #'
+#'@usage 
+#'\code{Sampleweights_indepth(ica, interest_IC, df, df_id = 0, var, test = c(NULL, "pearson", "spearman", "ttest", "wilcox", "anova", "welch", "kruskal"))}
+#'
+#'@param ica output of JADE
+#'
+#'@param interest_IC string indicating the component to test. i.e. "IC.1"
+#'
+#'@param df tibble containing the `df_id` and the variables to be tested
+#'
+#'@param df_id string indicating the column name containing the sample ids of
+#' `df`.
+#'
+#'@param var string indicating the variable you want to
+#' test against. Should be in the column names of `df`.
+#' 
+#'@param test string indicating the statistical test you would want to perform 
+#'to your data if any. Accepted options are (NULL, "pearson", "spearman",
+#' "ttest", "wilcox", "anova", "welch", "kruskal"). 
+#' 
 #'@details
-#'
-#'@param param
+#'Details of the test might change depending in the fullfiled by the IC sample
+#'weights. For pearson and spearman data must be in a double format. Normality 
+#'is asserted using shapiro.test and a IC of 95%. Homoscedasticity is asserted
+#'using fligner.test as it works better in cases where the normality
+#'assumption is unfulfilled.
 #'
 #'@return
+#'`Sampleweights_indepth` will return a ggplot object containing the analysis 
+#' carried so the user can choose the final layout using ggplot syntax. 
+#' For further details check the vignette (02_TCGA/Example_TCGA.Rmd)
 #'
 #'@examples
+#'
+#'ic17_OS <- Sampleweights_indepth(ica = best_ica,
+#'                      interest_IC = "IC.17",
+#'                    df = metadata_pdac_death,
+#'                    df_id = "bcr_patient_barcode",
+#'                    var = "OS.time",
+#'                    test = "spearman")
+#'
+#'ic17_OS + geom_point() + geom_smooth(method=lm) +
+#'  scale_colour_gradientn(colours = terrain.colors(10)) +
+#'  theme_bw()
+#'  
+#'@TBD
+
 Sampleweights_indepth <- function(ica,
-                                  interest_IC = FALSE,
+                                  interest_IC,
                                   df,
                                   df_id = 0,
                                   var,
@@ -666,101 +739,58 @@ Corr_by_ct <- function(A, decon){
 ################################################################################
 
 ################################################################################
-#'Title
+#'Explore Component Genes
 #'
 #'@description
+#' `PlotGeneWeights` allow the exploration of the genes that have the most 
+#' impact in the component.
 #'
+#'#'@usage 
+#'\code{PlotGeneWeights(ica, interest_IC, expression, df_id, n_genes = 25, column_annotation = NA)}
+#'
+#'
+#'@param ica output of JADE
+#'
+#'@param interest_IC string indicating the component to test. i.e. "IC.1"
+#'
+#'@param expression tibble containing the expression data used for ICA before 
+#'standarization `df_id` containing the genes should be a column.
+#'
+#'@param df_id string indicating the column name containing the gene ids of
+#' `df`. Should match those of the `ica`.
+#'
+#'@param n_genes integer indicating the number of up and down regulated genes 
+#'you want to visualize
+#'
+#'@param column_annotation argument inherited by annotation_col inside pheatmap.
+#'Must have the same sample ordering as the `df`.
+#' 
 #'@details
-#'
-#'@param param
+#'gene abreviations are recommended as df_ids. heatmap computed with pheatmap 
+#'and ggplotified via as.ggplot()
 #'
 #'@return
+#'a list of plots containing:
+#'- "densplot" which is the density plot of the gene weights and can give useful
+#'   information about how many genes are important and how.
+#'   
+#'- "heatmap" row standardize gene expression of the most positive and most 
+#'negative `n_genes`
 #'
 #'@examples
-
-Explore_GW <- function(S_sym, S_ensembl, elected_ncomp, interest_IC){
-  
-  # new
-  scran <- read_rds("../CellTypes_Markers_All_cells.rds")
-  
-  #old
-  # scran <- read_rds("../OLD_marker_list_By_levels.rds")
-  # scran <- scran$all_pops
-  
-  
-  gedepirRes <- gedepir::enrich(S_sym,scran, ICAbased = T)
-  
-  ct_enrich_tmp <- tibble(.rows = length(scran), )
-  ct_enrich_tmp$celltype <- names(scran)
-  ct_enrich_tmp %>% column_to_rownames("celltype") -> ct_enrich_tmp
-  
-  do.call(cbind, lapply(1:elected_ncomp, function(n) {
-    print(n)
-    ic = paste("IC.", n)
-    cts <- gedepirRes[[n]][["pathway"]]
-    es <- gedepirRes[[n]][["ES"]]
-    if(is_null(es)){
-      ct_enrich_tmp[, ic] = NA
-    }else{
-      ct_enrich_tmp[cts, ic] = es
-    }
-    print(c(cts, es))
-    ct_enrich_tmp
-  })) -> ct_enrich
-  colmat <- colorRampPalette(c("white", "black"))
-  data.matrix(ct_enrich) %>% t() %>% corrplot(is.corr = F, method = "color", col = colmat(200))
-  
-  ## GSVA on the Gene weights
-  ### gene set preparation
-  all_genesets <- msigdbr("Homo sapiens")
-  all_genesets %>% filter(gs_cat %in% c("H", "C2", "C7")) -> use_genesets
-  msigdbr_list = split(x = use_genesets$human_ensembl_gene, f = use_genesets$gs_name)
-  msigdb_descriptions <- use_genesets[c("gs_name", "gs_description")] %>%
-    unique() %>% column_to_rownames("gs_name")
-
-  gsvaRes <- gsva(data.matrix(S_ensembl), msigdbr_list, min.sz = 15)
-  gsvaRes[order(gsvaRes[,interest_IC]),]
-
-  gsvaRes %>% as.data.frame() %>%  mutate(the_rank = rank(-get(interest_IC), ties.method = "random")) %>%
-    dplyr::filter(the_rank < 25 | the_rank > (nrow(gsvaRes)-25)) %>% arrange(the_rank) %>%
-    dplyr::select(!c(the_rank)) -> gsvaTop
-
-
-  gsvaTop %>% pheatmap(cluster_rows = F) # to have a pheatmap
-  gsvaTop  %>% rownames() %>% msigdb_descriptions[.,] %>%
-    cbind(gsvaTop[interest_IC], .) %>% rownames_to_column("msigdb") %>% write_tsv("02_Output/gsvaRes_Puleo.tsv") #to write
-  
-  gsvaTop[,interest_IC, drop=F] %>% rownames_to_column("pathway") -> gsvaTop_intICtoplot
-  gsvaTop_intICtoplot$sign <- "pos"
-  gsvaTop_intICtoplot[gsvaTop_intICtoplot[,interest_IC] < 0, "sign"] <- "neg" 
-  
-  
-  ggplot(gsvaTop_intICtoplot[gsvaTop_intICtoplot$sign == "pos",], aes(reorder(str_sub(pathway, end = 50), get(interest_IC)),get(interest_IC), color = sign))  +
-    geom_point() + coord_flip() + scale_color_discrete(type = c("blue")) + theme(legend.position = "none", plot.title = element_text(lineheight=.8, face="bold")) +
-    labs(title = paste(interest_IC, "25 top gene sets"),y = "ES", x = NULL)
-  
-  ggplot(gsvaTop_intICtoplot[gsvaTop_intICtoplot$sign == "neg",], aes(reorder(str_sub(pathway, end = 50), get(interest_IC)),get(interest_IC), color = sign))  +
-    geom_point() + coord_flip() + scale_color_discrete(type = c("red")) + theme(legend.position = "none", plot.title = element_text(lineheight=.8, face="bold")) +
-    labs(title = paste(interest_IC, "25 bottom gene sets"),y = "ES", x = NULL)
-  
-  return(gsvaTop)
-}
-################################################################################
-
-################################################################################
-#'Title
 #'
-#'@description
-#'
-#'@details
-#'
-#'@param param
-#'
-#'@return
-#'
-#'@examples
+#'gw <- PlotGeneWeights(ica = best_ica,
+#' interest_IC = "IC.17",
+#' expression = tcga_gn,
+#' df_id = "gene",
+#' n_genes  = 25,
+#' column_annotation = NA)
+#' 
+#' ggarrange(gw[["densplot"]] + rremove("xylab"), gw[["heatmap"]], heights = c(1.5, 10), widths = c(0.2,1),
+#'           labels = c("A", "B"),
+#'           ncol = 2, nrow = 1)
 
-PlotGeneWeights <- function(ica, expression, df_id, n_genes, column_annotation = NA, interest_IC){
+PlotGeneWeights <- function(ica, interest_IC, expression, df_id, n_genes = 25, column_annotation = NA){
   return_plots <- list()
   
   S <- as_tibble(ica[["S"]], rownames = df_id)
