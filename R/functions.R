@@ -56,6 +56,11 @@ formatted_cors <- function(df, cor.stat){
 #' `Range_ICA` returns a list of lists with the A (sample weights)
 #'  and S (gene weights) matrices of the specified range.comp
 #'
+#'@author 
+#'Jacobo Solorzano
+#'Network Biology for Immuno-oncology
+#'Centre de Recherches en Cancerologie de Toulouse
+#'
 #'@examples
 #'
 
@@ -134,6 +139,11 @@ Range_ICA <- function(expression, df_id, range.comp = 2:20) {
 #' number of components with the `vars` of your choice. ggplot syntax can be
 #'used to directly alter or export the resulting plot.
 #' 
+#'@author 
+#'Jacobo Solorzano
+#'Network Biology for Immuno-oncology
+#'Centre de Recherches en Cancerologie de Toulouse
+#'
 #'@examples
 #'
 #'@TBD 
@@ -259,6 +269,11 @@ Best_nc <- function(icas_list,
 #'@return
 #'`Sampleweights_distribution`  will return a plot per column of the `df`.
 #'
+#'@author 
+#'Jacobo Solorzano
+#'Network Biology for Immuno-oncology
+#'Centre de Recherches en Cancerologie de Toulouse
+#'
 #'@examples
 #'
 #'#'@TBD 
@@ -347,6 +362,11 @@ Sampleweights_distribution <- function(ica, df, df_id, plotfile = NA){
 #' can be easily toggled afterwards using ggplot sintax to match the desired 
 #' format. 
 #' 
+#'@author 
+#'Jacobo Solorzano
+#'Network Biology for Immuno-oncology
+#'Centre de Recherches en Cancerologie de Toulouse
+#'
 #'@examples
 #'
 #'@TBD
@@ -451,6 +471,11 @@ ICA_explorator <- function(ica,
 #'`Sampleweights_indepth` will return a ggplot object containing the analysis 
 #' carried so the user can choose the final layout using ggplot syntax. 
 #' For further details check the vignette (02_TCGA/Example_TCGA.Rmd)
+#'
+#'@author 
+#'Jacobo Solorzano
+#'Network Biology for Immuno-oncology
+#'Centre de Recherches en Cancerologie de Toulouse
 #'
 #'@examples
 #'
@@ -776,6 +801,11 @@ Corr_by_ct <- function(A, decon){
 #'   
 #'- "heatmap" row standardize gene expression of the most positive and most 
 #'negative `n_genes`
+#'
+#'@author 
+#'Jacobo Solorzano
+#'Network Biology for Immuno-oncology
+#'Centre de Recherches en Cancerologie de Toulouse
 #'
 #'@examples
 #'
