@@ -117,5 +117,5 @@ Project Link: [https://github.com/j-solor/ICA_Toolkit](https://github.com/j-solo
 [stars-url]: https://github.com/j-solor/ICA_Toolkit/stargazers
 [issues-shield]: https://img.shields.io/github/issues/j-solor/ICA_Toolkit.svg?style=for-the-badge
 [issues-url]: https://github.com/othneildrew/j-solor/ICA_Toolkit/issues
-[license-shield]: https://img.shields.io/github/license/othneildrew/j-solor/ICA_Toolkit?style=for-the-badge
-[license-url]: https://github.com/othneildrew/j-solor/ICA_Toolkit/blob/master/LICENSE.txt
+[license-shield]: https://img.shields.io/github/license/j-solor/ICA_Toolkit?style=for-the-badge
+[license-url]: https://github.com/j-solor/ICA_Toolkit/blob/master/LICENSE.txt
