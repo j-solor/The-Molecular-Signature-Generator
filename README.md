@@ -1,22 +1,14 @@
 
 <!-- PROJECT SHIELDS -->
--->
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
 [![MIT License][license-shield]][license-url]
-[![LinkedIn][linkedin-shield]][linkedin-url]
 
 
 
 <!-- PROJECT LOGO -->
-<br />
-<div align="center">
-  <a href="https://github.com/othneildrew/Best-README-Template">
-    <img src="images/logo.png" alt="Logo" width="80" height="80">
-  </a>
-
   <h3 align="center">The ICA Toolkit</h3>
 
   <p align="center">
@@ -43,21 +35,8 @@
       <a href="#about-the-project">About The Project</a>
       <ul>
         <li><a href="#built-with">Built With</a></li>
-      </ul>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#usage">Usage</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
-    <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
 </details>
 
@@ -75,9 +54,9 @@ You can use this package in many ways:
 
 As everyone like plots their own way, the function here provided return ggplot object you can easily modify and combine  to suit your needs
 
-The method here provided is based in the analysis performed in [https://doi.org/10.1016/j.ebiom.2020.102858](R Nicolle et al 2020)
+The method here provided is based in the analysis performed in [R Nicolle et al 2020](https://doi.org/10.1016/j.ebiom.2020.102858)
 
-For now the only ICA algorithm implemented inside the ICA_Toolkit is [https://www.jstatsoft.org/article/view/v028i06](JADE), used through the [JADE R package](https://cran.r-project.org/web/packages/JADE/index.html) 
+For now the only ICA algorithm implemented inside the ICA_Toolkit is [JADE](https://www.jstatsoft.org/article/view/v028i06), used through the [JADE R package](https://cran.r-project.org/web/packages/JADE/index.html) 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 ### Built With
