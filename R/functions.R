@@ -73,9 +73,19 @@ Range_ICA <- function(expression, df_id, range.comp = 2:20) {
   samples <- colnames(df)
   
   for (n.comp in range.comp) {
-    jade_result <- JADE(df,
-                        n.comp = n.comp, maxiter = 100
+    jade_result <- tryCatch(
+      {
+        JADE(df, n.comp = n.comp, maxiter = 100)
+      },
+      error = function(cond) {
+        message(paste("JADE with ", n.comp, "did not converge, skipping iter"))
+        return(NA)
+      }
     )
+    if (jade_result[1] %>% is.na()) {
+      next
+    }
+
     l_name <- paste(c("nc", n.comp), collapse = "")
     ic_names <- paste("IC", 1:n.comp, sep = ".")
     
