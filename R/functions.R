@@ -63,6 +63,8 @@ formatted_cors <- function(df, cor.stat){
 #'
 #'@examples
 #'
+#'@TBD
+#'do last conditional more elegant and change name to Run_ICA
 
 Range_ICA <- function(expression, df_id, range.comp = 2:20) {
   
@@ -95,6 +97,11 @@ Range_ICA <- function(expression, df_id, range.comp = 2:20) {
     
     S_mats[[l_name]] <- jade_result[["S"]]
     colnames(S_mats[[l_name]]) <- ic_names
+  }
+  
+  if (length(n.comp) == 1){
+    A_mats = A_mats[[1]]
+    S_mats = S_mats[[1]]
   }
   
   return(list("A" = A_mats, "S" = S_mats, "samples" = samples))
@@ -247,6 +254,223 @@ Best_nc <- function(icas_list,
     rotate_x_text() +
     rremove("xlab")
 }
+################################################################################
+
+################################################################################
+#'Generate a bootstraped dataframe
+#'
+#'@description
+#'bootstrap_expression bootstrap sample or genewise a given tibble containing 
+#'expression data.
+#'
+#'@usage 
+#'\code{}
+#'
+#'@param expression tibble with sample names in columns and genes/probes in
+#' rows. Should be mean centered and fairly filtered.
+#' 
+#'@param expression_id name of the column containing the gene ids
+#'
+#'@param MARGIN integer either 1 or 2 determining whether rows (genes) or 
+#'columns (samples) respectively should be bootstrapped.
+#'
+#'@param perc double beween 0 and 1 staying the proportion of the dataframe 
+#'that should remain unaltered.
+#'
+#'@details
+#' `bootstrap_expression` takes a tibble and bootstrap with replacement either
+#'  genes (`MARGIN` = 1), or samples (`MARGIN` = 2) keeping a `perc` of the
+#'  dataset unaltered
+#'
+#'@return
+#' `bootstrap_expression` returns a ggplot barplot ordered by the mean association of the 
+#' number of components with the `vars` of your choice. ggplot syntax can be
+#'used to directly alter or export the resulting plot.
+#' 
+#'@author 
+#'Jacobo Solorzano
+#'Network Biology for Immuno-oncology
+#'Centre de Recherches en Cancerologie de Toulouse
+#'
+#'@examples
+#'
+#'@TBD 
+#'- do it the tidyverse way inside!!
+bootstrap_expression <- function(expression,
+                                 expression_id = "gene",
+                                 MARGIN,
+                                 perc = 0.9) {
+  
+  df <- expression %>% column_to_rownames(expression_id)
+  
+  if (MARGIN == 1) {
+    # rows
+    n <- round(nrow(df) * (1 - perc))
+    
+    out <- sample(rownames(df), n)
+    df_boot <- df[!(rownames(df) %in% out), ]
+    boot <- sample(rownames(df_boot), n)
+    df_boot[out, ] <- df_boot[boot, ]
+  }
+  
+  if (MARGIN == 2) {
+    # cols
+    n <- round(ncol(df) * (1 - perc))
+    
+    out <- sample(colnames(df), n)
+    df_boot <- df[, !(colnames(df) %in% out)]
+    boot <- sample(colnames(df_boot), n)
+    df_boot[, out] <- df_boot[, boot]
+  }
+  return(df_boot %>% rownames_to_column(expression_id))
+}
+
+################################################################################
+
+################################################################################
+#'Find the most robust number of components (less outliers)
+#'
+#'@description
+#'`Boot_ICA` compares the ICA results over a range of components with the same
+#' results when bootrapping samples or genes to ensure the robustness of the
+#' obtained components
+#'@usage 
+#'\code{Boot_ICA(expression, df_id, range.comp = 2:20, iterations = 1, seed = 0)}
+#'
+#'@param expression tibble with sample names in columns and genes/probes in
+#' rows. Should be mean centered and fairly filtered.
+#' 
+#'@param df_id name of the column containing the gene ids
+#' 
+#'@param range.comp a range in the format n:n to specify the range of number of 
+#'components to analyze. Not recomended to use more than 20 components. 
+#'Specially with small datasets.
+#'
+#'@param iterations integer indicating how many bootstraps will be performed for
+#' the comparison.
+#' 
+#'@param seed integer determining the random seed used for the bootstrrapping of 
+#'genes/samples
+#'
+#'@param perc double vector containing the proportion of samples that will be 
+#'kept unaltered in each bootstrap. Should be of length 2 and between 0 and 1.
+#'
+#'@details
+#' `Boot_ICA` run  `Range_ICA` over the original ICA samples and for each
+#'  iteration it generates a two bootstrapping datasets: one with bootstrapped 
+#'  sample and other with bootstrapped genes. Bootstrapping its done with 
+#'  replacement. The proportion of entries to replace its determined by the 
+#'  `perc` parameter. When bootstrapping samples, the matrices containing gene
+#'   weights (S) are compared. When bootstrapping genes, the matrices containing
+#'   sample weights (A) are. For each number of components, the correlation between
+#'   each original component and the absolute best of all the bootstrapping 
+#'   components its saved. 
+#'
+#'@return
+#' `Boot_ICA` returns a tibble with the absolute correlations of each ICA 
+#' component with the best matching bootstrapping ICA component for each number
+#' of components, iteration, and kind of bootstrapping (A samples, S for genes).
+#' This can be a direct input for visualization via ggplot (see example).
+#' 
+#'@author 
+#'Jacobo Solorzano
+#'Network Biology for Immuno-oncology
+#'Centre de Recherches en Cancerologie de Toulouse
+#'
+#'@examples
+#'
+#' tcga_p <- read_rds("01_Input/tcga_icaready.RDS")
+#' boot_res <- Boot_ICA(expression = tcga_p, df_id  =  "gene", range.comp = 2:20, iterations = 2, seed = 0)
+#'
+#'
+#' boot_res %>% dplyr::filter(bootstrap == "A") %>% ggplot() + aes(x = nc, y = correlation) +
+#' geom_boxplot(width = 0.5) +
+#'   labs(y = "absolute pearson correlation", x = "number of components") +
+#'   ggtitle("just sample bootstraps") +
+#'   coord_cartesian(ylim = c(0.8, 1)) +
+#'   theme_bw()
+#' 
+#' ggplot(boot_res) + aes(x = nc, y = correlation, fill = bootstrap) +
+#'   geom_boxplot(width = 0.5) +
+#'   labs(y = "absolute pearson correlation", x = "number of components") +
+#'   ggtitle("All bootstraps") +
+#'   coord_cartesian(ylim = c(0.8, 1)) +
+#'   theme_bw()
+
+#'@TBD 
+#'- paralelization via library(foreach) https://www.blasbenito.com/post/02_parallelizing_loops_with_r/
+#'- Add translation of A and S to gene and sample
+
+Boot_ICA <- function(expression,
+                            df_id = "gene",
+                            range.comp = 2:20,
+                            iterations = 1,
+                            seed = 0,
+                            perc = c(0.9, 0.9)) {
+  
+  original_ICA <- Range_ICA(expression, df_id, range.comp)
+  
+  set.seed(seed)
+  listof_correlations <- list()
+  listof_correlations_id <- list()
+  results <- list()
+  
+  for (i in 1:iterations) {
+  bootgene_expression <- bootstrap_expression(expression, MARGIN = 1, perc = perc[1])
+  bootsample_expression <- bootstrap_expression(expression, MARGIN = 2, perc = perc[2])
+  bootstraps <- list(S = bootsample_expression, A = bootgene_expression)
+
+  for (what_boot in c("A", "S")){
+    boot_expression <- bootstraps[[what_boot]]
+
+      # loop through iterations
+      boot_ICA <- Range_ICA(boot_expression, df_id, range.comp)
+      res <- boot_ICA[[what_boot]]
+      base_res <- original_ICA[[what_boot]]
+
+      correlations_id <- list()
+
+      for (nc in names(base_res)) {
+        # loop through ICA runs
+        base_ic <- base_res[[nc]]
+        res_ic <- res[[nc]]
+        cor_list <- as.list(rep(0, ncol(base_ic)))
+        cor_id_list <- as.list(rep(0, ncol(base_ic)))
+        names(cor_list) <- colnames(base_ic)
+        names(cor_id_list) <- colnames(base_ic)
+
+        for (b_ic in colnames(base_ic)) {
+          # loop through boot ICA components
+          for (r_ic in colnames(res_ic)) {
+            # loop through base ICA components
+            pears_c <- cor(base_ic[, b_ic], res_ic[, r_ic])
+
+            if (abs(pears_c) > abs(cor_list[[b_ic]])) {
+              # save the highest correlation between each
+              # base ICA component and every bootstrap ICA
+              cor_list[[b_ic]] <- pears_c
+              cor_id_list[[b_ic]] <- r_ic
+            }
+          }
+        }
+        # stopifnot(length(unique(unlist(cor_id_list))) == ncol(base_ic))
+        listof_correlations[[nc]][[i]] <- cor_list
+        # correlations_id[[nc]] <- cor_id_list
+      }
+      # listof_correlations_id[[i]] <- correlations_id
+      results[[what_boot]] <- listof_correlations
+    }
+  }
+  results_tibble <- melt(results) %>%
+    as_tibble() %>%
+    dplyr::rename(correlation = value, Component = L4, iteration = L3, nc = L2, bootstrap = L1) %>%
+    mutate(correlation = abs(correlation),
+           nc = factor(nc, level = names(results$A))) %>%
+    dplyr::arrange()
+
+  return(results_tibble)
+  }
+
 ################################################################################
 
 ################################################################################

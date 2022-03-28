@@ -71,42 +71,71 @@ tcga_p <- tcga__[abdv > median_abdv, ]
 write_rds(tcga_p, file = "01_Input/tcga_icaready.RDS")
 ```
 
-Now that the data is processed the next step is to iterate and run ICA over a range of components.
-This is done with the Range_ICA() function
+Now that the data is processed  there are two different ways ICA_toolkit can be used:
+
+#1 Find the most robust number of componenst (i.e. the number in which less components are caused by outliers).
+
+This is recommended for a unsupervised analysis. This allow the researcher to choose the number of components more robust for your data. This way you minimize the components due to single or little samples (outliers).
+
+## CAREFUL: Multithreading to be implemented. this example takes around 7 mins to run
+```{r}
+tcga_p <- read_rds("01_Input/tcga_icaready.RDS")
+
+boot_res <- Boot_ICA(expression = tcga_p, df_id  =  "gene", range.comp = 2:20, iterations = 20, seed = 0)
+
+ggplot(boot_res) + aes(x = nc, y = correlation, fill = bootstrap) +
+    geom_boxplot(width = 0.5) +
+    labs(y = "absolute pearson correlation", x = "number of components") +
+    coord_cartesian(ylim = c(0.8, 1)) +
+    theme_bw() +
+    rotate_x_text(45)
+
+ 
+```
+The idea is to then take the most robust number fo components (with the best correlations with the bootstrapped dataframes), but that as well allow us to keep the most components the better. Here I would choose 13 components.
+
+
+#2 Find Molecular signature
+When we know the existence of a factor with consequences at the gene expression 
+level we can use ICA_toolkit to produce a molecular signature of this factor and
+then be able to apply it to other datasets. For that first we directly generate
+ICAs over a range of components and then we will find the component that best
+represent the factor.
+
+the generation of ICAs over a range of components can be done with Range_ICA()
 
 ```{r}
 tcga_p <- read_rds("01_Input/tcga_icaready.RDS")
 icas_list <- Range_ICA(tcga_p, "gene", 2:20)
 ```
 
-Once we have the list of components we can start the component analysis. This time want to see the best component representing "OS.time" and "PFI.time" of just the patients with a confirmed PDAC caused dead.
-This is done with the Best_nc() function
+Once we have ICAs over the range of components we can for instance look for the
+best component representing "OS.time" and "PFI.time". In this case we use just 
+the patients with a confirmed PDAC caused dead.
+
+This is done with the Best_nc() function.
 
 ```{r}
 Best_nc(icas_list,
-        range.comp = 2:20, #! remove this argument
+        range.comp = 2:20,
         metadata = metadata_pdac_death,
         metadata_id = "bcr_patient_barcode",
         vars = "OS.time",
         is.categorical = F)
 ```
+
 Then we can check the graph and choose the best ICA space based in the number of components. In our case we are interested in a space where a single component represent the best these two variables. For that reason we chose the ICA space for nc = 18 components, where we are particularly interested in the IC. 17.
 
-So we extract this ICA from the iteration we did.
 
-Once we now this we can check the distribution of the rest of variables across this space
+# Exploration of the component space:
+
+So idependently on the method of choice, after choosing the ICA space we need to re-run Range_ICA, but this time only with the elected number of components to check the distribution of the rest of variables across this space, and try to figure out what each component is representing.
 
 ```{r}
-elected_ncomp = 18
-elected_ncomp_str <- paste("nc", elected_ncomp, sep = "")
-
-best_ica <- list()
-best_ica["S"] <- icas_list[["S"]][elected_ncomp_str]
-best_ica["A"] <- icas_list[["A"]][elected_ncomp_str]
-best_ica[["samples"]] <- icas_list[["samples"]]
+best_ica <- Range_ICA(tcga_p, "gene", 18)
 ```
 
-Now its time to analyze the ICA space we have chosen. For that bthe first step is to plot the components distribution to discriminate those components that could be caused by outliers. If annotations are provided as a dataset (with the same sample order) one plot will be generated per column contrastimg their distribution compared to the component space. Make sure that your continuous labels are doubles!
+Now its time to analyze the ICA space we have chosen. For that the first step is to plot the components distribution to discriminate those components that could be caused by outliers. If annotations are provided as a dataset (with the same sample order) one plot will be generated per column contrastimg their distribution compared to the component space. Make sure that your continuous labels are doubles!
 
 ```{r}
 annotations <- metadata_pdac_death %>%
@@ -118,7 +147,7 @@ Sampleweights_distribution(ica = best_ica,
 ```
 Now its the time to check the whole component space. For that we implemented a default function named ICA_explorator() to generate correlation plots with the data of your choice. We recommend to do a first test with the technical information available, as ICA can easily pick this kind of variability into a component.
 
-In this case we dont have such information, so we directly check the rest of the clinical data
+In this case we dont have such information, so we directly check the rest of the clinical data.
 
 ```{r, results='hide'}
 #! Fix conditional testing of vars with not enough datapoints
