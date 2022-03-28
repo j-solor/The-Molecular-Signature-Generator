@@ -49,9 +49,9 @@
 The ICA toolkit aims to give the ordinay bioinformatician the option to use Independent Component analysis (ICA) with ease.
 
 You can use this package in many ways:
-* Find the molecular signature of a given factor.
-* Find the best component number in data with know batch effect so you can explore it without the need of correcting it.
-* Explore all the components together, or particular components in depth for association.
+* Find the most robust number of components to do ICA
+* Find the most correlated component to a given fator.
+* Either way, This package provides the tools to also explore all the components together, or particular components in depth for association.
 
 At the moment the best source of information of this package is the [Demo R notebook](https://github.com/j-solor/ICA_Toolkit/blob/main/02_TCGA/Example_TCGA.Rmd) using TCGA data.
 
