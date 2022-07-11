@@ -50,14 +50,13 @@ tcga_gn <- dplyr::filter(tcga, gene %in% to_keep$SYMBOL)
 #2 Mean center genewise and selection of half most variable genes. Finally save an .RDS object as a checkpoint
 
 ```{r}
-
 tcga__ <- tcga_gn %>% pivot_longer(-gene, 'variable', 'value') %>%
-  pivot_wider(variable, gene) %>%
+  pivot_wider(id_cols = variable, names_from = gene) %>%
   mutate(across(where(is.numeric), ~ . - mean(.))) %>%
-  pivot_longer(-variable, 'gene', 'value') %>% 
-  pivot_wider(gene, variable)
+  pivot_longer(-variable, "gene",  "value") %>% 
+  pivot_wider(id_cols = gene, names_from = variable)
 
-abdv <- apply(tcga__%>% dplyr::select(-gene), 1, function(x) { #! could be piped with  add_row(variable = "mean", !!! colMeans(.[-1])) when transposed
+abdv <- apply(tcga__ %>% dplyr::select(-gene), 1, function(x) { #! could be piped with  add_row(variable = "mean", !!! colMeans(.[-1])) when transposed
   sum(
     abs(
       x - mean(x)
@@ -67,6 +66,15 @@ abdv <- apply(tcga__%>% dplyr::select(-gene), 1, function(x) { #! could be piped
 
 median_abdv <- median(abdv)
 tcga_p <- tcga__[abdv > median_abdv, ]
+
+# plots with A1CF as example gene
+pivot_longer(tcga_gn, -gene) %>% 
+  dplyr::filter(gene == "A1CF") %>% 
+  ggplot(aes(x = value)) + geom_density()
+
+pivot_longer(tcga_p, -gene) %>% 
+  dplyr::filter(gene == "A1CF") %>% 
+  ggplot(aes(x = value)) + geom_density()
 
 write_rds(tcga_p, file = "01_Input/tcga_icaready.RDS")
 ```
@@ -89,8 +97,6 @@ ggplot(boot_res) + aes(x = nc, y = correlation, fill = bootstrap) +
     coord_cartesian(ylim = c(0.8, 1)) +
     theme_bw() +
     rotate_x_text(45)
-
- 
 ```
 The idea is to then take the most robust number fo components (with the best correlations with the bootstrapped dataframes), but that as well allow us to keep the most components the better. Here I would choose 13 components.
 
@@ -204,7 +210,7 @@ tf_act__<- dorothea::run_viper(column_to_rownames(tcga, "gene"), regulons,
 # Format for analysis
 tf_act_ <- as_tibble(tf_act__, rownames = "TF") %>%
   pivot_longer(cols = -TF, names_to = "bcr_patient_barcode") %>%
-  pivot_wider(id_cols = c(TF, bcr_patient_barcode), names_from = TF)
+  pivot_wider(id_cols = c(bcr_patient_barcode), names_from = TF)
 
 # get 50 most variable
 tf_50_var <- summarise(tf_act_, across(where(is.double), var)) %>%
