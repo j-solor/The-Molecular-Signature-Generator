@@ -99,7 +99,7 @@ Range_ICA <- function(expression, df_id, range.comp = 2:20) {
     colnames(S_mats[[l_name]]) <- ic_names
   }
   
-  if (length(n.comp) == 1){
+  if (length(range.comp) == 1){
     A_mats = A_mats[[1]]
     S_mats = S_mats[[1]]
   }
