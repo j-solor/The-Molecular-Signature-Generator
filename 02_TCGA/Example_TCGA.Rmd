@@ -15,12 +15,11 @@ source(file = "/home/jacobo/Documents/05_DeconvolutionReview/R/functions.R")
 
 Then we load the data and metadata, with some filtering in the metadata too.
 
-```{r}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 tcga_raw <- read_tsv("01_Input/TCGA_TPM_PDAC.tsv") %>%
   rename_all(~str_replace_all(.,"-", ".")) # JADE change this automatically after, so better start with them like this
 
-metadata <- read_tsv("01_Input/TCGA-CDR-SupplementalTableS1.tsv") %>%
-  dplyr::select(-...1) %>%
+metadata <- read_tsv("01_Input/TCGA-CDR-SupplementalTableS1.tsv", col_types = cols(`...1` = col_skip())) %>%
   mutate(bcr_patient_barcode = str_replace_all(bcr_patient_barcode, "-", ".")) %>%
   mutate(OS.time = as.double(OS.time),
          PFI.time = as.double(PFI.time)) %>%
@@ -37,7 +36,7 @@ tcga <- tcga_raw %>%
 Next we need to prepare the TCGA data so we are able to run ICA in it. For that 
 
 #1 Filter the sexual chromosomes genes to avoid getting a sex component
-```{r}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 annot <- AnnotationDbi::select(org.Hs.eg.db, keys=tcga$gene, columns=c("ENSEMBL", "MAP"), keytype="SYMBOL")
 to_keep <- dplyr::filter(annot, !grepl('X|Y', MAP)) %>%
   drop_na(MAP) %>%
@@ -155,7 +154,7 @@ Now its the time to check the whole component space. For that we implemented a d
 
 In this case we dont have such information, so we directly check the rest of the clinical data.
 
-```{r, results='hide'}
+```{r message=FALSE, warning=FALSE, include=FALSE}
 #! Fix conditional testing of vars with not enough datapoints
 #! Fix ploting size for ncomponents close to 20
 ## clinical data
@@ -241,7 +240,7 @@ tcga_decon <- read_rds("01_Input/TCGA_PAAD_curated_deconvolutions_m.RDS") %>%
 res <- Corr_by_ct(best_ica[["A"]], tcga_decon)
 ```
 
-We also offer an additional function to quickly explore any individual correlation you would like more indepth, specially related to the particular component IC.17. This is Sampleweights_indepth(), and can take continuous or discrete variables. it returns a ggplot object so you can choose to plot it as you like. You can use any ggplot function or strategy in these including coloring for additional factors
+We also offer an additional function to quickly explore any individual correlation you would like more in depth, specially related to the particular component IC.17. This is Sampleweights_indepth(), and can take continuous or discrete variables. it returns a ggplot object so you can choose to plot it as you like. You can use any ggplot function or strategy in these including coloring for additional factors
 ```{r}
 ic17_gender <- Sampleweights_indepth(ica = best_ica,
                       interest_IC = "IC.17",
@@ -303,7 +302,7 @@ library(msigdbr)
 library(GSVA)
 
 all_genesets <- msigdbr("Homo sapiens")
-use_genesets <- dplyr::filter(all_genesets, gs_cat %in% c("H", "C2"))
+use_genesets <- dplyr::filter(all_genesets, gs_subcat %in% c("CP:REACTOME"))
 msigdbr_list <- split(x = use_genesets$gene_symbol, f = use_genesets$gs_name)
 msigdb_descriptions <- use_genesets[c("gs_name", "gs_description")] %>%
   unique() %>% column_to_rownames("gs_name")
@@ -318,7 +317,8 @@ gsvaTop <- as_tibble(gsvaRes, rownames = "gs_name") %>%  mutate(the_rank = rank(
 
 ggplot(gsvaTop, aes(x = IC.17, y = gs_name, color = sign)) + 
   geom_point() +
-  ggtitle("Best H and C2 gene sets IC.17") +
+  ggtitle("Best Reactome gene sets IC.17") +
+  xlab("NES") +
   theme_bw() +
   rremove("legend") +
   rremove("ylab")
