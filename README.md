@@ -9,10 +9,10 @@
 
 
 <!-- PROJECT LOGO -->
-  <h3 align="center">The ICA Toolkit</h3>
+  <h3 align="center">The Molecular Signature Generator</h3>
 
   <p align="center">
-    An easy and bioinformatic oriented package to find the independent component most related to a given factor!
+    An easy and bioinformatic oriented package to find a molecular signature related to a given factor!
     <br />
     <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ"><strong> Explore the docs »</strong></a>
     <br />
