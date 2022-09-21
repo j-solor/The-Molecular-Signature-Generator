@@ -1062,19 +1062,20 @@ PlotGeneWeights <- function(ica, interest_IC, expression, df_id, n_genes = 25, c
   return_plots <- list()
   
   S <- as_tibble(ica[["S"]], rownames = df_id)
-  S_sort <- arrange(S, get(interest_IC))
-  S_mneg <- head(S_sort, n_genes)
-  S_mpos <- tail(S_sort, n_genes)
+  S_sort <- arrange(S, desc(get(interest_IC)))
+  S_mneg <- tail(S_sort, n_genes)
+  S_mpos <- head(S_sort, n_genes)
   
   return_plots[["densplot"]] <- ggplot(S) +
     aes_string(y = interest_IC) +
     geom_density(alpha=.5, fill="#AED3FA") +
       geom_hline(yintercept = 0, colour = "black") +
-      geom_hline(yintercept = max(S_mneg[interest_IC]), colour = "#7DB0DD", linetype = "dashed") + 
-      geom_hline(yintercept = min(S_mpos[interest_IC]), colour = "#EAAFBB", linetype = "dashed") + 
+      scale_x_reverse() +
+      annotate("rect",xmin = -Inf, xmax = Inf,   ymin = min(S_mneg[interest_IC]), ymax = max(S_mneg[interest_IC]),   fill = "blue", alpha = 0.5) +
+      annotate("rect",xmin = -Inf, xmax = Inf,   ymin =  min(S_mpos[interest_IC]), ymax = max(S_mpos[interest_IC]),   fill = "red", alpha = 0.5) +
       theme_classic()
 
-    tibble(name = S_mneg[[df_id]], class = "most negative") %>% add_row(name = S_mpos[[df_id]], class = "most possitive") %>% column_to_rownames("name") -> annot_row 
+annot_row <- tibble(name = S_mpos[[df_id]], class = "most possitive") %>% add_row(name = S_mneg[[df_id]], class = "most negative") %>% column_to_rownames("name") 
     
     return_plots[["heatmap"]] <- dplyr::filter(expression, get(df_id) %in% rownames(annot_row)) %>%
       dplyr::arrange(match(get(df_id), rownames(annot_row))) %>%
