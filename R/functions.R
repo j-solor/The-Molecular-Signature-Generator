@@ -756,12 +756,16 @@ Sampleweights_indepth <- function(ica,
   }
 
   ## equal variance (fligner test as its better with non normality)
-  v.pv <- fligner.test(get(interest_IC) ~ get(var), data = to_test)$p.value
-  if (v.pv < 0.05) {
-    eqvar <- FALSE
+  if(vartype == "discrete"){
+    v.pv <- fligner.test(get(interest_IC) ~ get(var), data = to_test)$p.value
+    if (v.pv < 0.05) {
+      eqvar <- FALSE
+      } else {
+        eqvar <- TRUE
+      }
   } else {
-    eqvar <- TRUE
-  }
+    eqvar <- NaN
+    }
 
 
   cat("Assumption check:\n")
