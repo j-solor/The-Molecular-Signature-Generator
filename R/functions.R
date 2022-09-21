@@ -188,11 +188,11 @@ Best_nc <- function(icas_list,
     correlations[[cv]][["Rs"]] <- list()
   }
 
-  
+  range.comp = names(icas_list$A)
   for (n.comp in range.comp) {
-    nc_str <- paste("nc", n.comp, sep ="")
-    ica.nc <- icas_list$A[[nc_str]] %>% as_tibble(rownames = "samples")
-    test_vars <- dplyr::rename(metadata, samples = all_of(metadata_id)) %>% inner_join(ica.nc, by = "samples")
+    ica.nc <- icas_list$A[[n.comp]] %>% as_tibble(rownames = "samples")
+    test_vars <- dplyr::rename(metadata, samples = all_of(metadata_id)) %>%
+      inner_join(ica.nc, by = "samples")
     
     if (is.categorical == FALSE){
       continuous_var <- c(names(ica.nc), vars)
@@ -206,8 +206,8 @@ Best_nc <- function(icas_list,
       res2$P <- res2$P[vars, names(ica.nc)[-1],drop=F]
       
       for (cv in vars) { 
-        correlations[[cv]]$Rs[[nc_str]] <- res2$r[cv,]
-        correlations[[cv]]$Pvals[[nc_str]] <- res2$P[cv,]
+        correlations[[cv]]$Rs[[n.comp]] <- res2$r[cv,]
+        correlations[[cv]]$Pvals[[n.comp]] <- res2$P[cv,]
       }
     } else if (is.categorical == TRUE){
       discrete_var <- c(names(ica.nc), vars)
@@ -222,19 +222,19 @@ Best_nc <- function(icas_list,
       disp_ratio <- disp0/dispgs
       
       for (dv in vars) { 
-        correlations[[dv]]$Rs[[nc_str]] <- as.numeric(disp_ratio) %>% set_names(.,names(disp_ratio))
-        correlations[[dv]]$Pvals[[nc_str]] <- NULL
+        correlations[[dv]]$Rs[[n.comp]] <- as.numeric(disp_ratio) %>% set_names(.,names(disp_ratio))
+        correlations[[dv]]$Pvals[[n.comp]] <- NULL
       }
     }
 
     # Check the best IC and save it as a representative of the nc
     for (cv in vars){
-      best_c <- sort(abs(correlations[[cv]]$Rs[[nc_str]]),decreasing = T)[1] %>% names()
-      to_plot %>% add_row(nc = nc_str,
+      best_c <- sort(abs(correlations[[cv]]$Rs[[n.comp]]),decreasing = T)[1] %>% names()
+      to_plot %>% add_row(nc = n.comp,
                           var = cv,
                           IC = best_c,
-                          R = abs(correlations[[cv]]$Rs[[nc_str]][[best_c]]),
-                          Pval = correlations[[cv]]$Pvals[[nc_str]][[best_c]]) -> to_plot
+                          R = abs(correlations[[cv]]$Rs[[n.comp]][[best_c]]),
+                          Pval = correlations[[cv]]$Pvals[[n.comp]][[best_c]]) -> to_plot
     }
     }
   
