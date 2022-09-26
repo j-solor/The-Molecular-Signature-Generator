@@ -1058,7 +1058,7 @@ Corr_by_ct <- function(A, decon){
 #'           labels = c("A", "B"),
 #'           ncol = 2, nrow = 1)
 
-PlotGeneWeights <- function(ica, interest_IC, expression, df_id, n_genes = 25, column_annotation = NA){
+PlotGeneWeights <- function(ica, interest_IC, expression, df_id, n_genes = 25, column_annotation = NA, annotation_colors = NA){
   return_plots <- list()
   
   S <- as_tibble(ica[["S"]], rownames = df_id)
@@ -1081,7 +1081,7 @@ annot_row <- tibble(name = S_mpos[[df_id]], class = "most possitive") %>% add_ro
       dplyr::arrange(match(get(df_id), rownames(annot_row))) %>%
       column_to_rownames(df_id) %>% 
       pheatmap(scale = "row", annotation_row = annot_row, cluster_rows = F, 
-               annotation_col = column_annotation) %>% as.ggplot()
+               annotation_col = column_annotation, annotation_colors = annotation_colors, show_rownames = F, show_colnames =  F) %>% as.ggplot()
     dev.off()
     
     return(return_plots)
