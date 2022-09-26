@@ -1081,7 +1081,7 @@ annot_row <- tibble(name = S_mpos[[df_id]], class = "most possitive") %>% add_ro
       dplyr::arrange(match(get(df_id), rownames(annot_row))) %>%
       column_to_rownames(df_id) %>% 
       pheatmap(scale = "row", annotation_row = annot_row, cluster_rows = F, 
-               annotation_col = column_annotation, annotation_colors = annotation_colors, show_rownames = F, show_colnames =  F) %>% as.ggplot()
+               annotation_col = column_annotation, annotation_colors = annotation_colors, show_rownames = T, show_colnames =  T) %>% as.ggplot()
     dev.off()
     
     return(return_plots)
